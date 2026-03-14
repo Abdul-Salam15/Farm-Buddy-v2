@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card" style="max-width: 600px; margin: 40px auto; padding: 30px;">
+    <h2>My Profile</h2>
+    <p>Update your personal information, language preference, and password.</p>
+
+    {% if messages %}
+    <div class="messages" style="margin-bottom: 20px;">
+        {% for message in messages %}
+        <div class="alert {{ message.tags }}"
+            style="padding: 10px; background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 4px;">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Profile & Language Form -->
+    <div style="margin-bottom: 40px;">
+        <h3 style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color);">General
+            Settings</h3>
+        <form method="post" action="{% url 'user_settings' %}" novalidate>
+            {% csrf_token %}
+            {{ user_form.non_field_errors }}
+
+            <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="form-group">
+                    {{ user_form.first_name.label_tag }}
+                    {{ user_form.first_name }}
+                    {{ user_form.first_name.errors }}
+                </div>
+                <div class="form-group">
+                    {{ user_form.last_name.label_tag }}
+                    {{ user_form.last_name }}
+                    {{ user_form.last_name.errors }}
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 15px;">
+                {{ user_form.preferred_language.label_tag }}
+                {{ user_form.preferred_language }}
+                <div class="help-text" style="display: block; margin-top: 4px;">This updates your default global
+                    language UI.</div>
+                {{ user_form.preferred_language.errors }}
+            </div>
+
+            <button type="submit" name="update_profile" value="1" class="btn"
+                style="margin-top: 20px; width: 100%;">Save Profile Info</button>
+        </form>
+    </div>
+
+    <!-- Password Change Form -->
+    <div>
+        <h3 style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color);">Change
+            Password</h3>
+        <form id="pwChangeForm" method="post" action="{% url 'user_settings' %}" novalidate>
+            {% csrf_token %}
+            {{ password_form.non_field_errors }}
+
+            {% for field in password_form %}
+            <div class="form-group" style="margin-bottom: 15px;">
+                {{ field.label_tag }}
+                <div class="password-wrapper">
+                    {{ field }}
+                    <button type="button" class="password-toggle" onclick="togglePassword(this)">👁️</button>
+                </div>
+                {% if field.errors %}
+                <ul class="errorlist">{% for error in field.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+                {% endif %}
+                {% if field.help_text %}
+                <div class="help-text">{{ field.help_text|safe }}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            <button type="submit" name="change_password" value="1" class="btn"
+                style="background-color: #f44336; border-color: #e53935; margin-top: 20px; width: 100%;">Update
+                Password</button>
+        </form>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Strip 'required' from all inputs on page so password fields
+    // don't block the profile form save button (server validates anyway)
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('input, select, textarea').forEach(function (el) {
+            el.removeAttribute('required');
+        });
+    });
+
+    function togglePassword(btn) {
+        const input = btn.previousElementSibling;
+        if (input.type === 'password') {
+            input.type = 'text';
+            btn.textContent = '🔒';
+        } else {
+            input.type = 'password';
+            btn.textContent = '👁️';
+        }
+    }
+</script>
+{% endblock %}

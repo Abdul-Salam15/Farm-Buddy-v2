@@ -1,0 +1,289 @@
+/* Account pages styling */
+:root {
+    --primary-color: #2E7D32;
+    --primary-light: #4CAF50;
+    --primary-hover: #1B5E20;
+    --bg-main: #FFFFFF;
+    --text-primary: #1A1A1A;
+    --text-secondary: #4A4A4A;
+    --border-color: #E0E0E0;
+}
+
+[data-theme="dark"] {
+    --primary-color: #66BB6A;
+    --primary-light: #81C784;
+    --bg-main: #121212;
+    --text-primary: #E0E0E0;
+    --text-secondary: #B0B0B0;
+    --border-color: #333333;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+}
+
+.site-header {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 12px 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.site-header nav {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.site-header a {
+    color: white;
+    text-decoration: none;
+    margin-right: 20px;
+}
+
+.site-header a:hover {
+    text-decoration: underline;
+}
+
+main {
+    max-width: 600px;
+    margin: 40px auto;
+    padding: 0 20px;
+}
+
+.card {
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 30px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] .card {
+    background-color: #1E1E1E;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.card h2 {
+    color: var(--primary-color);
+    margin-bottom: 8px;
+    font-size: 24px;
+}
+
+[data-theme="dark"] .card h2 {
+    color: var(--primary-light);
+}
+
+.card p {
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group {
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+}
+
+label {
+    font-weight: 500;
+    margin-bottom: 6px;
+    color: #333333;
+    font-size: 14px;
+}
+
+[data-theme="dark"] label {
+    color: #E0E0E0;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+select,
+textarea {
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+    background-color: #f9f9f9;
+    color: #333333;
+    transition: border-color 0.2s;
+}
+
+
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+select:focus,
+textarea:focus {
+    outline: none;
+    border-color: var(--primary-light);
+    background-color: white;
+    color: #000;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+}
+
+
+
+.password-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-wrapper input {
+    width: 100%;
+    padding-right: 40px;
+    /* Space for the eye icon */
+}
+
+.password-toggle {
+    position: absolute;
+    right: 10px;
+    background: none;
+    border: none;
+    color: #777777;
+    /* Set a fixed dark-ish grey for visibility on white background */
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    height: 100%;
+}
+
+.password-toggle:hover {
+    color: var(--primary-color);
+}
+
+textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.help-text {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    display: none;
+    /* Hidden by default */
+}
+
+.form-group.has-error .help-text {
+    display: block;
+    color: #c62828;
+}
+
+.errorlist {
+    list-style: none;
+    padding: 8px;
+    background-color: #ffebee;
+    border-left: 4px solid #e53935;
+    margin-bottom: 16px;
+    border-radius: 4px;
+    color: #c62828;
+    font-size: 13px;
+}
+
+.errorlist li {
+    margin: 4px 0;
+}
+
+button[type="submit"],
+.btn {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    margin-right: 12px;
+}
+
+button[type="submit"]:hover,
+.btn:hover {
+    background-color: var(--primary-hover);
+}
+
+.btn-link {
+    background-color: transparent;
+    color: var(--primary-color);
+    border: 1px solid var(--primary-light);
+    text-decoration: none;
+    display: inline-block;
+    margin-top: 8px;
+}
+
+.btn-link:hover {
+    background-color: rgba(76, 175, 80, 0.1);
+}
+
+a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+@media (max-width: 600px) {
+    .card {
+        padding: 20px;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* PWA Status Badges */
+.status-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: 10px;
+}
+
+.status-badge.offline {
+    background: #da3633;
+    color: white;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}

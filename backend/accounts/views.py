@@ -1,0 +1,405 @@
+from django.shortcuts import render, redirect
+from django.contrib.auth import login, logout
+from django.contrib.auth.forms import AuthenticationForm, PasswordChangeForm
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from .forms import CustomUserCreationForm, FarmerProfileForm, UserSettingsForm
+from .models import FarmerProfile
+import json
+import random
+import os
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from chat.models import Message
+
+# Daily suggestions for different languages
+TIPS = {
+    'en': [
+        "Water your crops early in the morning to reduce evaporation.",
+        "Check soil moisture before watering - squeeze a handful of soil.",
+        "Mulch around plants to retain moisture and suppress weeds.",
+        "Rotate your crops annually to maintain soil health.",
+        "Use compost to enrich your soil naturally.",
+        "Monitor for pests regularly to catch problems early.",
+        "Ensure good drainage to prevent waterlogging.",
+        "Plant nitrogen-fixing crops to improve soil fertility.",
+        "Keep a record of what grows well in your soil.",
+        "Prune dead leaves to encourage new growth.",
+    ],
+    'ha': [
+        "Bayar da ruwa ga amfanin gona da sassafe don rage fitar ruwa.",
+        "Bincika damshin ƙasa kafin shayarwa.",
+        "Yi amfani da takin gargajiya don haɓaka ƙasarku.",
+        "Juya amfanin gona a kowace shekara don kiyaye lafiyar ƙasa.",
+    ],
+    'ig': [
+        "Na-agba ihe ọkụkụ gị mmiri n'isi ụtụtụ iji belata evaporation.",
+        "Lelee mmiri dị n'ala tupu ị gbaa mmiri.",
+        "Jiri compost mee ka ala gị baa ọgaranya n'ụzọ sitere n'okike.",
+    ],
+    'yo': [
+        "Fun awọn irugbin rẹ ni omi ni kutukutu owurọ lati dinku evaporation.",
+        "Ṣayẹwo ọrinrin ile ṣaaju ki o to fun omi.",
+        "Lo compost lati jẹ ki ile rẹ jẹ ọlọrọ nipa ti ara.",
+    ],
+    'pcm': [
+        "Water your crops for early morning make water no dry quick.",
+        "Check if soil get water before you pour more.",
+        "Use compost make your soil get power naturally.",
+    ]
+}
+
+def get_daily_tip(lang):
+    """Returns a tip based on the day of the year to ensure it changes daily."""
+    from datetime import datetime
+    day_of_year = datetime.now().timetuple().tm_yday
+    lang_tips = TIPS.get(lang, TIPS['en'])
+    return lang_tips[day_of_year % len(lang_tips)]
+
+# Extensive list of general tips for English (can be randomized later)
+SUGGESTIONS = [
+    "Water your crops early in the morning to reduce evaporation.",
+    "Check soil moisture before watering - squeeze a handful of soil.",
+    "Mulch around plants to retain moisture and suppress weeds.",
+    "Rotate your crops annually to maintain soil health.",
+    "Use compost to enrich your soil naturally.",
+    "Monitor for pests regularly to catch problems early.",
+    "Ensure good drainage to prevent waterlogging.",
+    "Plant nitrogen-fixing crops to improve soil fertility.",
+    "Keep a record of what grows well in your soil.",
+    "Prune dead leaves to encourage new growth.",
+]
+
+@csrf_exempt
+def signup_step1(request):
+    if request.method == 'POST':
+        if request.headers.get('Content-Type') == 'application/json':
+            data = json.loads(request.body)
+            # Map password to password1/password2 for CustomUserCreationForm
+            data['password1'] = data.get('password')
+            data['password2'] = data.get('confirmPassword')
+            form = CustomUserCreationForm(data)
+        else:
+            form = CustomUserCreationForm(request.POST)
+
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            if request.headers.get('Content-Type') == 'application/json':
+                return JsonResponse({'success': True, 'message': 'Account created successfully!'})
+            messages.success(request, "Account created successfully! Welcome to FarmBuddy.")
+            return redirect('signup_step2')
+        else:
+            if request.headers.get('Content-Type') == 'application/json':
+                return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+    else:
+        form = CustomUserCreationForm()
+    return render(request, 'accounts/signup.html', {'form': form, 'step': 1})
+
+
+@csrf_exempt
+def signup_step2(request):
+    if not request.user.is_authenticated:
+        if request.headers.get('Content-Type') == 'application/json':
+            return JsonResponse({'success': False, 'error': 'Unauthorized. Please sign up Step 1 first.'}, status=401)
+        return redirect('login')
+        
+    profile, created = FarmerProfile.objects.get_or_create(user=request.user)
+    
+    if request.method == 'POST':
+        if request.headers.get('Content-Type') == 'application/json':
+            data = json.loads(request.body)
+            form = FarmerProfileForm(data, instance=profile)
+        else:
+            form = FarmerProfileForm(request.POST, instance=profile)
+
+        if form.is_valid():
+            form.save()
+            if request.headers.get('Content-Type') == 'application/json':
+                return JsonResponse({'success': True, 'message': 'Profile updated!'})
+            return redirect('index')
+        else:
+            if request.headers.get('Content-Type') == 'application/json':
+                return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+    else:
+        form = FarmerProfileForm(instance=profile)
+    
+    return render(request, 'accounts/signup_step2.html', {'form': form, 'step': 2, 'show_welcome': created})
+
+
+@csrf_exempt
+def login_view(request):
+    if request.method == 'POST':
+        if request.headers.get('Content-Type') == 'application/json':
+            data = json.loads(request.body)
+            form = AuthenticationForm(data=data)
+        else:
+            form = AuthenticationForm(data=request.POST)
+
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+            if request.headers.get('Content-Type') == 'application/json':
+                return JsonResponse({'success': True, 'user': {'username': user.username, 'email': user.email}})
+            messages.success(request, f"Welcome back, {user.username}!")
+            return redirect('index')
+        else:
+            if request.headers.get('Content-Type') == 'application/json':
+                return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+    else:
+        form = AuthenticationForm()
+    return render(request, 'accounts/login.html', {'form': form})
+
+
+@csrf_exempt
+def logout_view(request):
+    logout(request)
+    if request.headers.get('Content-Type') == 'application/json' or request.GET.get('format') == 'json':
+        return JsonResponse({'success': True})
+    return redirect('login')
+
+
+@csrf_exempt
+@login_required
+def profile_view(request):
+    profile, _ = FarmerProfile.objects.get_or_create(user=request.user)
+    
+    if request.method == 'POST':
+        if request.headers.get('Content-Type') == 'application/json':
+            data = json.loads(request.body)
+            form = FarmerProfileForm(data, instance=profile)
+        else:
+            form = FarmerProfileForm(request.POST, instance=profile)
+
+        if form.is_valid():
+            profile = form.save()
+            # Sync with User model
+            user = request.user
+            user.first_name = profile.first_name or ""
+            user.last_name = profile.last_name or ""
+            user.save()
+            
+            if request.headers.get('Content-Type') == 'application/json':
+                return JsonResponse({'success': True, 'message': 'Farm Data updated successfully!'})
+            messages.success(request, 'Farm Data updated successfully!')
+            return redirect('profile')
+        else:
+            if request.headers.get('Content-Type') == 'application/json':
+                return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+    else:
+        form = FarmerProfileForm(instance=profile)
+        if request.headers.get('Content-Type') == 'application/json' or 'application/json' in request.headers.get('Accept', ''):
+            # Return profile data as JSON
+            data = {
+                'username': request.user.username,
+                'email': request.user.email,
+                'first_name': profile.first_name,
+                'last_name': profile.last_name,
+                'preferred_language': profile.preferred_language,
+                'location': profile.location,
+                'farm_size_acres': str(profile.farm_size_acres) if profile.farm_size_acres else '',
+                'soil_type': profile.soil_type,
+                'ph_level': profile.ph_level,
+                'water_source': profile.water_source,
+                'current_crops': profile.current_crops,
+                'past_crops': profile.past_crops,
+                'top_pests': profile.top_pests,
+                'has_livestock': profile.has_livestock,
+                'livestock_types': profile.livestock_types,
+                'telegram_link_token': profile.get_or_create_link_token(),
+                'daily_tip': get_daily_tip(profile.preferred_language or 'en'),
+            }
+            return JsonResponse({'success': True, 'profile': data})
+
+    # Daily suggestions
+    lang = profile.preferred_language or 'en'
+    daily_suggestion = get_daily_tip(lang)
+    
+    # Get last 5 chat messages from user
+    last_chats = Message.objects.filter(
+        conversation__user=request.user
+    ).order_by('-created_at')[:5]
+    
+    # Prepare forecast data (mock 7-day forecast)
+    # In production, this would come from weather API
+    forecast_data = {
+        'days': ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        'temps': [28, 30, 29, 31, 27, 26, 28],
+        'humidity': [65, 60, 70, 55, 75, 72, 68],
+    }
+    
+    user_lang = getattr(getattr(request.user, 'farmerprofile', None), 'preferred_language', 'en')
+
+    labels = {
+        'en': {
+            'tip_label': '💡 Daily Tip',
+            'connected_label': '📱 Stay Connected',
+            'connected_sub': 'Get farming advice on Telegram',
+            'telegram_btn': 'Open Telegram Bot',
+            'edit_farm': 'Edit Farm Data',
+            'save_farm': 'Save Farm Data',
+            'forecast_label': '📊 Weekly Forecast',
+            'chat_label': '💬 Recent Chat History',
+            'no_msgs': 'No recent messages. Start chatting to see your history here.',
+        },
+        'ha': {
+            'tip_label': '💡 Shawarar Rana',
+            'connected_label': '📱 Kasance da Mu',
+            'connected_sub': 'Sami shawarwarin noma a Telegram',
+            'telegram_btn': 'Bude Telegram Bot',
+            'edit_farm': 'Gyara Bayanan Gona',
+            'save_farm': 'Ajiye Bayanan Gona',
+            'forecast_label': '📊 Hasashen Mako',
+            'chat_label': '💬 Tattaunawar Karshe',
+            'no_msgs': 'Babu saƙonni kwanan nan. Fara hira don ganin tarihin ku a nan.',
+        },
+        'ig': {
+            'tip_label': '💡 Ndụmọdụ Kwa Ụbọchị',
+            'connected_label': '📱 Nọrọ na njikọ',
+            'connected_sub': 'Nweta ndụmọdụ ọrụ ugbo na Telegram',
+            'telegram_btn': 'Mepee Telegram Bot',
+            'edit_farm': 'Dezie Data Ugbo',
+            'save_farm': 'Chekwaa Data Ugbo',
+            'forecast_label': '📊 Amụma Izu Nke a',
+            'chat_label': '💬 Mkparịta Ọhụrụ Ndị Na-adịbeghị anya',
+            'no_msgs': 'Enweghị ozi ndị na-adịbeghị anya. Malite nkata ka ịhụ akụkọ ihe mere eme gị ebe a.',
+        },
+        'yo': {
+            'tip_label': '💡 Imọran Ojoojumọ',
+            'connected_label': '📱 Wa ni Isopọ',
+            'connected_sub': 'Gba imọran ogbin lori Telegram',
+            'telegram_btn': 'Ṣii Telegram Bot',
+            'edit_farm': 'Ṣatunkọ Data Oko',
+            'save_farm': 'Fi Data Oko Pam',
+            'forecast_label': '📊 Àsọtẹ́lẹ̀ Ọ̀sẹ̀',
+            'chat_label': '💬 Itan Ifọrọwerọ Titun',
+            'no_msgs': 'Ko si ifiranṣẹ tuntun. Bẹrẹ ifọrọwerọ lati wo itan rẹ nibi.',
+        },
+    }
+
+    # Get or create telegram link token
+    profile = request.user.farmerprofile
+    link_token = profile.get_or_create_link_token()
+    bot_username = os.getenv("TELEGRAM_BOT_USERNAME", "FarmBuddyAI_Bot")
+    telegram_bot_link = f"https://t.me/{bot_username}?start={link_token}"
+
+    context = {
+        'form': form,
+        'last_chats': last_chats,
+        'forecast_data': json.dumps(forecast_data),
+        'daily_suggestion': daily_suggestion,
+        'telegram_bot_link': telegram_bot_link,
+        **labels.get(user_lang, labels['en'])
+    }
+
+    return render(request, 'accounts/profile.html', context)
+
+
+@csrf_exempt
+def user_settings_view(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=401)
+        
+    if request.method == 'GET':
+        profile = getattr(request.user, 'farmerprofile', None)
+        return JsonResponse({
+            'success': True,
+            'user': {
+                'first_name': request.user.first_name,
+                'last_name': request.user.last_name,
+                'email': request.user.email,
+                'preferred_language': profile.preferred_language if profile else 'en'
+            }
+        })
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            action = data.get('action')
+            
+            if action == 'update_profile':
+                user_form = UserSettingsForm(data, user=request.user)
+                if user_form.is_valid():
+                    user_form.save()
+                    return JsonResponse({'success': True, 'message': 'Profile updated successfully!'})
+                return JsonResponse({'success': False, 'errors': user_form.errors}, status=400)
+                
+            elif action == 'change_password':
+                password_form = PasswordChangeForm(request.user, data)
+                if password_form.is_valid():
+                    user = password_form.save()
+                    login(request, user)
+                    return JsonResponse({'success': True, 'message': 'Password updated successfully!'})
+                return JsonResponse({'success': False, 'errors': password_form.errors}, status=400)
+            
+            return JsonResponse({'success': False, 'error': 'Invalid action'}, status=400)
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+            
+    return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+
+@login_required
+def update_language_preference(request):
+    """API endpoint to update user language via AJAX from the global navbar"""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            new_var = data.get('language')
+            if new_var in dict(FarmerProfile.LANGUAGE_CHOICES):
+                profile, _ = FarmerProfile.objects.get_or_create(user=request.user)
+                profile.preferred_language = new_var
+                profile.save()
+                return JsonResponse({'status': 'success'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    return JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=400)
+
+@csrf_exempt
+def forgot_password_view(request):
+    """API endpoint for password recovery via security question."""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            action = data.get('action')
+            username = data.get('username')
+            
+            if not username:
+                return JsonResponse({'success': False, 'error': 'Username is required'}, status=400)
+                
+            try:
+                user = User.objects.get(username__iexact=username)
+                profile = user.farmerprofile
+            except (User.DoesNotExist, FarmerProfile.DoesNotExist):
+                return JsonResponse({'success': False, 'error': 'User not found'}, status=404)
+            
+            if action == 'get_question':
+                # We use a hardcoded question "What is the name of your grand father?"
+                # but we could also store dynamic questions.
+                return JsonResponse({
+                    'success': True,
+                    'question': "What is the name of your grand father?",
+                    'has_answer': bool(profile.security_answer)
+                })
+                
+            elif action == 'reset_password':
+                answer = data.get('answer')
+                new_password = data.get('new_password')
+                
+                if not profile.security_answer:
+                    return JsonResponse({'success': False, 'error': 'Security question not set for this account.'}, status=400)
+                
+                if answer.strip().lower() == profile.security_answer.strip().lower():
+                    if len(new_password) < 6:
+                        return JsonResponse({'success': False, 'error': 'Password must be at least 6 characters'}, status=400)
+                    
+                    user.set_password(new_password)
+                    user.save()
+                    return JsonResponse({'success': True, 'message': 'Password reset successful!'})
+                else:
+                    return JsonResponse({'success': False, 'error': 'Incorrect security answer'}, status=400)
+            
+            return JsonResponse({'success': False, 'error': 'Invalid action'}, status=400)
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+            
+    return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)

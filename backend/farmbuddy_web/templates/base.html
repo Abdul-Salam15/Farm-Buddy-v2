@@ -1,0 +1,120 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#238636">
+  <title>FarmBuddy</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <link rel="stylesheet" href="{% static 'css/accounts.css' %}">
+  {% block extra_css %}{% endblock %}
+</head>
+
+<body data-user-lang="{{ user_lang }}">
+  <header class="site-header">
+    <nav>
+      <a href="/chat/">FarmBuddy</a>
+      <span style="float:right; display: flex; align-items: center; gap: 15px;">
+        <select id="languageSelect" class="language-select" title="Select Language"
+          style="padding: 5px 10px; border-radius: 15px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary); cursor: pointer; outline: none;">
+          {% if user_lang == 'en' %}
+          <option value="en" selected>English 🇬🇧</option>
+          {% else %}
+          <option value="en">English 🇬🇧</option>
+          {% endif %}
+
+          {% if user_lang == 'ha' %}
+          <option value="ha" selected>Hausa 🇳🇬</option>
+          {% else %}
+          <option value="ha">Hausa 🇳🇬</option>
+          {% endif %}
+
+          {% if user_lang == 'ig' %}
+          <option value="ig" selected>Igbo 🇳🇬</option>
+          {% else %}
+          <option value="ig">Igbo 🇳🇬</option>
+          {% endif %}
+
+          {% if user_lang == 'yo' %}
+          <option value="yo" selected>Yoruba 🇳🇬</option>
+          {% else %}
+          <option value="yo">Yoruba 🇳🇬</option>
+          {% endif %}
+        </select>
+        {% if user.is_authenticated %}
+        <a href="{% url 'profile' %}">My Farm</a> |
+        <a href="{% url 'logout' %}">Logout</a>
+        {% else %}
+        <a href="{% url 'login' %}">Login</a> |
+        <a href="{% url 'signup' %}">Sign up</a>
+        {% endif %}
+      </span>
+    </nav>
+  </header>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="{% static 'js/chat.js' %}"></script>
+  {% block scripts %}{% endblock %}
+
+  <script>
+    // Register Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(reg => console.log('SW Registered!', reg))
+          .catch(err => console.log('SW Registration failed!', err));
+      });
+    }
+
+    // Global script for Language Selection tracking
+    document.addEventListener("DOMContentLoaded", function () {
+      const languageSelect = document.getElementById("languageSelect");
+      if (languageSelect) {
+        languageSelect.addEventListener("change", function (e) {
+          const selectedLang = e.target.value;
+
+          // Try to get CSRF token
+          let csrftoken = null;
+          const cookies = document.cookie.split(';');
+          for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, 10) === ('csrftoken=')) {
+              csrftoken = decodeURIComponent(cookie.substring(10));
+              break;
+            }
+          }
+
+          if (csrftoken) {
+            fetch("/accounts/update-language/", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrftoken
+              },
+              body: JSON.stringify({ language: selectedLang })
+            }).then(response => {
+              if (response.ok) {
+                // Future logic: Trigger language refresh throughout app UI
+                // For now, reload the page to apply any server-rendered language changes if applicable
+                window.location.reload();
+              } else {
+                console.error("Failed to update language preference");
+              }
+            }).catch(err => console.error("Error updating language:", err));
+          } else {
+            console.error("CSRF token not found for language update");
+          }
+        });
+      }
+    });
+  </script>
+</body>
+
+</html>

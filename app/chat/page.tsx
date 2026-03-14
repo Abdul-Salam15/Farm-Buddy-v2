@@ -728,7 +728,7 @@ export default function ChatPage() {
         {/* Chat Area */}
         <div className="flex flex-1 flex-col overflow-hidden">
           <ScrollArea className="flex-1 h-full" ref={scrollAreaRef}>
-            <div className="mx-auto max-w-3xl px-4 py-8">
+            <div className="mx-auto max-w-3xl px-4 pt-20 pb-8">
               {messages.length === 0 ? (
                 <div className="flex flex-col items-center py-8">
                   <div className="mb-6 rounded-2xl bg-accent/50 p-6">

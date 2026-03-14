@@ -60,8 +60,8 @@ export default function ProfilePage() {
     preferred_language: "en",
     location: "",
     farm_size_acres: "",
-    soil_type: "unsure",
-    ph_level: "unsure",
+    soil_type: "unknown",
+    ph_level: "unknown",
     water_source: "rainfed",
     current_crops: "",
     past_crops: "",
@@ -136,8 +136,8 @@ export default function ProfilePage() {
           const profile = data.profile
           setProfileData({
             ...profile,
-            soil_type: profile.soil_type || "unsure",
-            ph_level: profile.ph_level || "unsure",
+            soil_type: profile.soil_type || "unknown",
+            ph_level: profile.ph_level || "unknown",
           })
           if (profile.location) {
             fetchWeather(profile.location)
@@ -381,7 +381,7 @@ export default function ProfilePage() {
                           <SelectValue placeholder="Select soil type" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="unsure">I am not sure</SelectItem>
+                          <SelectItem value="unknown">I am not sure</SelectItem>
                           <SelectItem value="sandy">Sandy</SelectItem>
                           <SelectItem value="clay">Clay</SelectItem>
                           <SelectItem value="loamy">Loamy</SelectItem>
@@ -391,7 +391,7 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="ph_level">Soil Quality</Label>
+                      <Label htmlFor="ph_level">Soil Acidity (pH)</Label>
                       <Select 
                         value={profileData.ph_level} 
                         onValueChange={(val) => handleSelectChange('ph_level', val)}
@@ -400,10 +400,10 @@ export default function ProfilePage() {
                           <SelectValue placeholder="Select description" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="unsure">I am not sure</SelectItem>
-                          <SelectItem value="fertile">Very fertile</SelectItem>
-                          <SelectItem value="moderate">Moderately fertile</SelectItem>
-                          <SelectItem value="poor">Poor quality</SelectItem>
+                          <SelectItem value="unknown">I am not sure</SelectItem>
+                          <SelectItem value="acidic">Acidic (tastes sour, kills grass)</SelectItem>
+                          <SelectItem value="neutral">Neutral (normal soil)</SelectItem>
+                          <SelectItem value="alkaline">Alkaline (white crust on soil surface)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

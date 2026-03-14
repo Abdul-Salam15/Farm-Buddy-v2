@@ -1,0 +1,617 @@
+from django.shortcuts import render, redirect, get_object_or_404
+from django.http import JsonResponse, StreamingHttpResponse
+from django.views.decorators.http import require_http_methods, require_GET
+from django.views.decorators.csrf import csrf_exempt
+from django.db.models import Q
+import json
+import sys
+import os
+
+# Add parent directory to path to import utils
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.gemini_api import ask_gemini, analyze_plant_image
+from .context_builder import build_system_prompt, parse_xai_refs
+from utils.weather_api import get_weather, get_forecast, get_weather_by_city, get_forecast_by_city, format_weather_for_ai, format_forecast_for_ai
+
+from .models import Conversation, Message
+
+
+def index(request, conversation_id=None):
+    """Main chat interface"""
+    if conversation_id:
+        try:
+            # Only allow access to conversations owned by the current user
+            if request.user.is_authenticated:
+                current_conversation = Conversation.objects.get(id=conversation_id, user=request.user)
+            else:
+                current_conversation = Conversation.objects.get(id=conversation_id, user__isnull=True)
+            request.session['conversation_id'] = current_conversation.id
+        except Conversation.DoesNotExist:
+            return redirect('index')
+    else:
+        if request.user.is_authenticated:
+            # Get or create a conversation owned by this user
+            user_conv = Conversation.objects.filter(user=request.user).order_by('-updated_at').first()
+            if user_conv:
+                current_conversation = user_conv
+                request.session['conversation_id'] = current_conversation.id
+            else:
+                current_conversation = Conversation.objects.create(user=request.user)
+                request.session['conversation_id'] = current_conversation.id
+        else:
+            # Unauthenticated users get their own session-scoped conversations
+            session_conv_id = request.session.get('conversation_id')
+            if session_conv_id:
+                try:
+                    current_conversation = Conversation.objects.get(id=session_conv_id, user__isnull=True)
+                except Conversation.DoesNotExist:
+                    current_conversation = Conversation.objects.create()
+                    request.session['conversation_id'] = current_conversation.id
+            else:
+                current_conversation = Conversation.objects.create()
+                request.session['conversation_id'] = current_conversation.id
+
+    # Get messages for current conversation
+    chat_messages = current_conversation.messages.all()
+
+    # Get conversations for sidebar — strictly filtered to the current user
+    if request.user.is_authenticated:
+        conversations = Conversation.objects.filter(user=request.user).order_by('-updated_at')[:20]
+    else:
+        # Unauthenticated users only see the conversation in their current session
+        conversations = Conversation.objects.filter(id=current_conversation.id)
+
+    # Determine language for UI rendering
+    lang = 'en'
+    if request.user.is_authenticated:
+        try:
+            from accounts.models import FarmerProfile
+            lang = FarmerProfile.objects.get(user=request.user).preferred_language
+        except Exception:
+            lang = 'en'
+
+    context = {
+        'current_conversation': current_conversation,
+        'chat_messages': chat_messages,
+        'conversations': conversations,
+        'lang': lang,
+        'user_lang': lang,
+    }
+    return render(request, 'chat/index.html', context)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def send_message(request):
+    """Handle sending a message and getting AI response"""
+    try:
+        data = json.loads(request.body)
+        user_message = data.get('message', '').strip()
+        language = data.get('language', 'en')
+        conversation_id = data.get('conversation_id') # Explicit ID support
+        
+        if not user_message:
+            return JsonResponse({'success': False, 'error': 'Empty message'})
+        
+        # Get current conversation — enforce ownership
+        if not conversation_id:
+            conversation_id = request.session.get('conversation_id')
+
+        try:
+            if request.user.is_authenticated:
+                if conversation_id:
+                    conversation = Conversation.objects.get(id=conversation_id, user=request.user)
+                else:
+                    conversation = Conversation.objects.filter(user=request.user).order_by('-updated_at').first()
+                    if not conversation:
+                        conversation = Conversation.objects.create(user=request.user)
+            else:
+                if conversation_id:
+                    conversation = Conversation.objects.get(id=conversation_id, user__isnull=True)
+                else:
+                    conversation = Conversation.objects.create()
+            
+            request.session['conversation_id'] = conversation.id
+        except Conversation.DoesNotExist:
+            if request.user.is_authenticated:
+                conversation = Conversation.objects.create(user=request.user)
+            else:
+                conversation = Conversation.objects.create()
+            request.session['conversation_id'] = conversation.id
+        
+        # Save user message
+        Message.objects.create(
+            conversation=conversation,
+            role='user',
+            content=user_message
+        )
+        
+        # Get conversation history for context
+        messages_history = list(conversation.messages.all().values('role', 'content'))
+        
+        # Generator for streaming response
+        def response_generator():
+            full_response = ""
+            try:
+                try:
+                    system_prompt = build_system_prompt(request.user) if request.user.is_authenticated else ""
+                except Exception:
+                    system_prompt = ''
+
+                weather_context = request.session.get('weather_context') or ''
+                combined_context = system_prompt + "\n\n" + weather_context if system_prompt else weather_context
+
+                stream = ask_gemini(messages_history, weather_context=combined_context, stream=True, language=language)
+                
+                for chunk in stream:
+                    full_response += chunk
+                    yield json.dumps({'chunk': chunk}) + "\n"
+                
+                try:
+                    clean_text, refs = parse_xai_refs(full_response)
+                except Exception:
+                    clean_text, refs = full_response, []
+
+                Message.objects.create(
+                    conversation=conversation,
+                    role='assistant',
+                    content=clean_text,
+                    references=refs
+                )
+                
+                yield json.dumps({'success': True, 'full_text': full_response, 'references': refs, 'conversation_id': conversation.id}) + "\n"
+                
+                if conversation.messages.count() == 2 and (not conversation.title or conversation.title == "New Chat"):
+                     def update_title_background(conv_id, text):
+                        try:
+                            from utils.gemini_api import summarize_title
+                            c = Conversation.objects.get(id=conv_id)
+                            c.title = summarize_title(text)
+                            c.save()
+                        except Exception as e:
+                            print(f"Error updating title: {e}")
+
+                     import threading
+                     thread = threading.Thread(target=update_title_background, args=(conversation.id, user_message))
+                     thread.daemon = True
+                     thread.start()
+
+            except Exception as e:
+                print(f"Stream Error: {e}")
+                yield json.dumps({'error': str(e)}) + "\n"
+
+        return StreamingHttpResponse(response_generator(), content_type='application/x-ndjson')
+        
+    except Exception as e:
+        print(f"Error in send_message: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def new_conversation(request):
+    """Create a new conversation"""
+    try:
+        if request.user.is_authenticated:
+            conversation = Conversation.objects.create(user=request.user)
+        else:
+            conversation = Conversation.objects.create()
+        request.session['conversation_id'] = conversation.id
+        return JsonResponse({'success': True, 'conversation_id': conversation.id, 'title': conversation.title})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+@require_GET
+def api_conversation_history(request, conversation_id):
+    """Return JSON history for a conversation"""
+    try:
+        if request.user.is_authenticated:
+            conversation = get_object_or_404(Conversation, id=conversation_id, user=request.user)
+        else:
+            conversation = get_object_or_404(Conversation, id=conversation_id, user__isnull=True)
+            
+        messages = conversation.messages.all().order_by('created_at')
+        message_list = []
+        for m in messages:
+            msg_data = {
+                'id': m.id,
+                'role': m.role,
+                'content': m.content,
+                'created_at': m.created_at.isoformat(),
+                'references': m.references,
+            }
+            if m.image:
+                msg_data['image_url'] = m.image.url
+            message_list.append(msg_data)
+            
+        return JsonResponse({
+            'success': True, 
+            'conversation': {
+                'id': conversation.id,
+                'title': conversation.title,
+                'updated_at': conversation.updated_at.isoformat()
+            },
+            'messages': message_list
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+@require_GET
+def api_list_conversations(request):
+    """List conversations for the current user/session"""
+    try:
+        if request.user.is_authenticated:
+            conversations = Conversation.objects.filter(user=request.user).order_by('-updated_at')
+        else:
+            # For anonymous users, we rely on the session ID
+            conv_id = request.session.get('conversation_id')
+            if conv_id:
+                conversations = Conversation.objects.filter(id=conv_id, user__isnull=True)
+            else:
+                conversations = []
+                
+        data = [{
+            'id': c.id,
+            'title': c.title,
+            'updated_at': c.updated_at.isoformat()
+        } for c in conversations]
+        
+        return JsonResponse({'success': True, 'conversations': data})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def upload_image(request):
+    """Handle plant image upload and analysis"""
+    try:
+        from utils.gemini_api import analyze_plant_image
+        from utils.image_processing import validate_image
+        from django.core.files.storage import default_storage
+        
+        if 'image' not in request.FILES:
+            return JsonResponse({'success': False, 'error': 'No image provided'}, status=400)
+        
+        image_file = request.FILES['image']
+        
+        # Validate image
+        is_valid, error_msg = validate_image(image_file)
+        if not is_valid:
+            return JsonResponse({'success': False, 'error': error_msg}, status=400)
+        
+        # Get current conversation — enforce ownership
+        conversation_id = request.POST.get('conversation_id') or request.session.get('conversation_id')
+        try:
+            if request.user.is_authenticated:
+                if conversation_id:
+                    conversation = Conversation.objects.get(id=conversation_id, user=request.user)
+                else:
+                    conversation = Conversation.objects.filter(user=request.user).order_by('-updated_at').first()
+                    if not conversation:
+                        conversation = Conversation.objects.create(user=request.user)
+            else:
+                if conversation_id:
+                    conversation = Conversation.objects.get(id=conversation_id, user__isnull=True)
+                else:
+                    # Check if session has a conversation that is anonymous
+                    session_conv_id = request.session.get('conversation_id')
+                    if session_conv_id:
+                        try:
+                            conversation = Conversation.objects.get(id=session_conv_id, user__isnull=True)
+                        except Conversation.DoesNotExist:
+                            conversation = Conversation.objects.create()
+                    else:
+                        conversation = Conversation.objects.create()
+        except Conversation.DoesNotExist:
+            if request.user.is_authenticated:
+                conversation = Conversation.objects.create(user=request.user)
+            else:
+                conversation = Conversation.objects.create()
+            request.session['conversation_id'] = conversation.id
+
+        # Get optional text caption
+        text_content = request.POST.get('message', '').strip()
+        if not text_content:
+            text_content = '[Plant image uploaded for analysis]'
+            
+        # Save user message with image
+        user_message = Message.objects.create(
+            conversation=conversation,
+            role='user',
+            content=text_content,
+            image=image_file
+        )
+            # Get the saved image path
+        image_path = user_message.image.path
+        
+        from django.http import StreamingHttpResponse
+
+        # Build context for vision analysis
+        system_prompt = build_system_prompt(request.user if request.user.is_authenticated else None)
+        weather_context = request.session.get('weather_context') or ''
+        combined_context = f"{system_prompt}\n\n[WEATHER INFO]: {weather_context}" if system_prompt else weather_context
+
+        # Save AI response placeholder and then yield chunks
+        def vision_response_generator():
+            full_response = ""
+            try:
+                # Analyze image with Gemini Vision in streaming mode
+                stream = analyze_plant_image(image_path, system_context=combined_context, stream=True)
+                
+                for chunk in stream:
+                    full_response += chunk
+                    yield json.dumps({'chunk': chunk}) + "\n"
+                
+                # Parse references from the final response
+                try:
+                    clean_text, refs = parse_xai_refs(full_response)
+                except Exception:
+                    clean_text, refs = full_response, []
+
+                # Save AI response to DB
+                Message.objects.create(
+                    conversation=conversation,
+                    role='assistant',
+                    content=clean_text,
+                    references=refs
+                )
+                
+                # Signal completion with references
+                yield json.dumps({
+                    'success': True, 
+                    'full_text': clean_text, 
+                    'references': refs,
+                    'image_url': user_message.image.url
+                }) + "\n"
+                
+                if conversation.messages.count() == 2:
+                    conversation.title = "Plant Disease Analysis"
+                    conversation.save()
+
+            except Exception as e:
+                print(f"Error in vision stream: {e}")
+                yield json.dumps({'success': False, 'error': str(e)}) + "\n"
+
+        return StreamingHttpResponse(vision_response_generator(), content_type='application/x-ndjson')
+        
+    except Exception as e:
+        print(f"Error in upload_image: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def rename_conversation(request, conversation_id):
+    """Rename a conversation — only the owning user may rename it"""
+    try:
+        if request.user.is_authenticated:
+            conversation = get_object_or_404(Conversation, id=conversation_id, user=request.user)
+        else:
+            conversation = get_object_or_404(Conversation, id=conversation_id, user__isnull=True)
+        data = json.loads(request.body)
+        new_title = data.get('title', '').strip()
+
+        if not new_title:
+            return JsonResponse({'success': False, 'error': 'Empty title'}, status=400)
+
+        conversation.title = new_title[:200]
+        conversation.save()
+
+        return JsonResponse({'success': True, 'title': conversation.title})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST", "DELETE"])
+def delete_conversation(request, conversation_id):
+    """Delete a conversation — only the owning user may delete it"""
+    try:
+        if request.user.is_authenticated:
+            conversation = get_object_or_404(Conversation, id=conversation_id, user=request.user)
+        else:
+            conversation = get_object_or_404(Conversation, id=conversation_id, user__isnull=True)
+        conversation.delete()
+
+        if str(request.session.get('conversation_id')) == str(conversation_id):
+            if 'conversation_id' in request.session:
+                del request.session['conversation_id']
+
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def get_weather_data(request):
+    """Fetch and store weather data"""
+    try:
+        data = json.loads(request.body)
+        lat = data.get('lat')
+        lon = data.get('lon')
+        city = data.get('city')
+        
+        if city:
+            weather_data = get_weather_by_city(city)
+            forecast_data = get_forecast_by_city(city)
+        elif lat and lon:
+            weather_data = get_weather(lat, lon)
+            forecast_data = get_forecast(lat, lon)
+        else:
+            return JsonResponse({'success': False, 'error': 'Missing coordinates or city'}, status=400)
+        
+        if "error" in weather_data:
+            return JsonResponse({'success': False, 'error': weather_data['error']})
+        if "error" in forecast_data:
+            return JsonResponse({'success': False, 'error': forecast_data['error']})
+            
+        current_report = format_weather_for_ai(weather_data)
+        forecast_report = format_forecast_for_ai(forecast_data)
+        
+        full_report = f"{current_report}\n\n{forecast_report}"
+        
+        # Store in session for use in next chat message
+        request.session['weather_context'] = full_report
+        
+        return JsonResponse({
+            'success': True, 
+            'report': full_report,
+            'data': {'current': weather_data, 'forecast': forecast_data}
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def transcribe_audio(request):
+    """Transcribe audio using Gemini"""
+    try:
+        from utils.gemini_api import analyze_plant_image # Reuse analyzing logic structure
+        import google.generativeai as genai
+        
+        if 'audio' not in request.FILES:
+            return JsonResponse({'success': False, 'error': 'No audio provided'}, status=400)
+            
+        audio_file = request.FILES['audio']
+        language = request.POST.get('language', 'en')
+        
+        # Save temp file
+        temp_path = f"temp_{audio_file.name}"
+        with open(temp_path, 'wb+') as destination:
+            for chunk in audio_file.chunks():
+                destination.write(chunk)
+                
+        try:
+            # Upload to Gemini
+            myfile = genai.upload_file(temp_path)
+            model = genai.GenerativeModel("gemini-flash-lite-latest")
+            
+            prompt = f"Transcribe this audio exactly as spoken. The language is likely {language} (Hausa/Igbo/Yoruba/English). Return ONLY the transcription text, no other commentary."
+            
+            result = model.generate_content([myfile, prompt])
+            transcription = result.text.strip()
+            
+            # Cleanup
+            os.remove(temp_path)
+            
+            return JsonResponse({'success': True, 'text': transcription})
+            
+        except Exception as ignored:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            raise ignored
+
+    except Exception as e:
+        try:
+            print(f"Streaming Error: {e}")
+        except:
+            pass
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+# Global cache for MMS models
+mms_models = {}
+
+def load_mms_model(lang_code):
+    """Load and cache MMS model for a given language code"""
+    if lang_code in mms_models:
+        return mms_models[lang_code]
+    
+    # Map app codes to MMS codes
+    # yo -> yor, ig -> ibo, ha -> hau
+    iso_codes = {
+        'ha': 'hau',
+        'ig': 'ibo',
+        'yo': 'yor'
+    }
+    mms_code = iso_codes.get(lang_code, lang_code)
+    
+    model_id = f"facebook/mms-tts-{mms_code}"
+    try:
+        from transformers import VitsModel, AutoTokenizer
+        print(f"Loading MMS Model: {model_id}...")
+        tokenizer = AutoTokenizer.from_pretrained(model_id)
+        model = VitsModel.from_pretrained(model_id)
+        mms_models[lang_code] = (tokenizer, model)
+        return tokenizer, model
+    except Exception as e:
+        print(f"Error loading MMS model {model_id}: {e}")
+        return None, None
+
+@csrf_exempt
+def speak_text(request):
+    """Convert text to speech using YarnGPT APIs"""
+    if not request.user.is_authenticated:
+        return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=401)
+        
+    try:
+        if request.method == 'POST':
+            data = json.loads(request.body)
+            text = data.get('text', '').strip()
+            language = data.get('language', 'en')
+        else:
+            text = request.GET.get('text', '').strip()
+            language = request.GET.get('language', 'en')
+        
+        if not text:
+            return JsonResponse({'success': False, 'error': 'No text provided'}, status=400)
+        
+        # Clean text
+        clean_text = text.replace('*', '').replace('#', '')
+        
+        # Use YarnGPT API for all languages
+        from utils.gemini_api import YARNGPT_API_KEY, YARNGPT_API_URL
+        import requests
+        from django.http import StreamingHttpResponse
+        
+        headers = {
+            "Authorization": f"Bearer {YARNGPT_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        # Decide voice based on language
+        # Documented voices: Idera (Yoruba/Eng), Zainab (Hausa), Chinenye (Igbo)
+        voice = "Idera" 
+        if language == 'ha':
+            voice = "Zainab"
+        elif language == 'ig':
+            voice = "Chinenye"
+        elif language == 'yo':
+            voice = "Idera"
+            
+        payload = {
+            "text": clean_text,
+            "voice": voice
+        }
+            
+        # Use stream=True to start passing chunks as soon as they arrive from YarnGPT
+        api_response = requests.post(YARNGPT_API_URL, headers=headers, json=payload, stream=True)
+        
+        if api_response.status_code == 200:
+            content_type = api_response.headers.get('Content-Type', 'audio/mpeg')
+            
+            # Pipe the response chunks directly to the browser
+            response = StreamingHttpResponse(
+                api_response.iter_content(chunk_size=8192),
+                content_type=content_type
+            )
+            response['Cache-Control'] = 'no-cache'
+            return response
+        else:
+            error_text = api_response.text
+            return JsonResponse({'success': False, 'error': f"YarnGPT API Error: {error_text}"}, status=500)
+        
+    except Exception as e:
+        try:
+            print(f"TTS Error: {e}")
+        except:
+            pass
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)

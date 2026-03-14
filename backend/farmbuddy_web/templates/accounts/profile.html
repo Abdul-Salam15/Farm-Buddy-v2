@@ -1,0 +1,256 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<style>
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .dashboard-card {
+    background: #F1F8E9;
+    border: 1px solid #C8E6C9;
+    border-radius: 8px;
+    padding: 16px;
+  }
+
+  [data-theme="dark"] .dashboard-card {
+    background: #1B3320;
+    border-color: #2E5233;
+  }
+
+  .suggestion-box {
+    background: #FFF9C4;
+    border-left: 4px solid #FBC02D;
+    padding: 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  [data-theme="dark"] .suggestion-box {
+    background: #3E3820;
+    border-left-color: #F9A825;
+  }
+
+  .btn-telegram {
+    background-color: #0088cc;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    text-decoration: none;
+    display: inline-block;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+  }
+
+  .btn-telegram:hover {
+    background-color: #0077b3;
+  }
+
+  .chat-history-list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .chat-history-list li {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  .chat-history-list li:last-child {
+    border-bottom: none;
+  }
+
+  .forecast-chart-container {
+    position: relative;
+    height: 300px;
+  }
+
+  @media (max-width: 768px) {
+    .dashboard-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 0 auto;">
+
+  <!-- Dashboard Overview -->
+  <div class="dashboard-grid">
+    <!-- Daily Suggestion -->
+    <div class="dashboard-card">
+      <h4 style="margin-top: 0; color: #1B5E20;">{{ tip_label }}</h4>
+      <div class="suggestion-box">{{ daily_suggestion }}</div>
+    </div>
+
+    <!-- Telegram Bot -->
+    <div class="dashboard-card">
+      <h4 style="margin-top: 0; color: #1B5E20;">{{ connected_label }}</h4>
+      <p style="margin-bottom: 12px; font-size: 13px;">{{ connected_sub }}</p>
+      <a href="{{ telegram_bot_link }}" class="btn-telegram" target="_blank">{{ telegram_btn }}</a>
+    </div>
+  </div>
+
+  <!-- Edit Farm Data -->
+  <div class="card" style="margin-bottom: 20px;">
+    <h3 style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color);">{{ edit_farm }}
+    </h3>
+    <form method="post">
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+      <div
+        style="background: #ffebee; border: 1px solid #ef5350; border-radius: 4px; padding: 12px; margin-bottom: 16px; color: #c62828;">
+        <ul class="errorlist" style="margin: 0; padding-left: 20px;">
+          {% for error in form.non_field_errors %}
+          <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      <div class="dashboard-grid">
+        {% for field in form %}
+        {% if field.field.widget.input_type != 'hidden' %}
+        <div class="form-group {% if field.errors %}has-error{% endif %}">
+          <label for="{{ field.id_for_label }}" class="dashboard-label">{{ field.label }}</label>
+          {{ field }}
+          {% if field.errors %}
+          <ul class="errorlist" style="margin: 4px 0 0 0; padding-left: 20px; color: #c62828; font-size: 13px;">
+            {% for error in field.errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+          {% if field.help_text %}
+          <div class="help-text" style="display:block; margin-top: 4px; font-size: 12px; color: var(--text-secondary);">
+            {{ field.help_text|safe }}
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+
+      <button type="submit" class="btn" style="margin-top: 15px;">{{ save_farm }}</button>
+    </form>
+  </div>
+
+  <!-- Weekly Forecast -->
+  <div class="card">
+    <h3>{{ forecast_label }}</h3>
+    <div class="forecast-chart-container">
+      <canvas id="forecastChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Last 5 Chats -->
+  <div class="card">
+    <h3>{{ chat_label }}</h3>
+    {% if last_chats %}
+    <ul class="chat-history-list">
+      {% for msg in last_chats %}
+      <li>
+        <strong>{{ msg.get_role_display }}:</strong>
+        {{ msg.content|truncatewords:10 }}
+        <br>
+        <small style="color: #999;">{{ msg.created_at|date:"M d, Y H:i" }}</small>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p style="color: var(--text-secondary); font-size: 13px;">{{ no_msgs }}</p>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Chart.js for rendering forecast graph -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  // Translated labels rendered server-side to avoid quote conflicts
+  var tempLabel = "{% if user_lang == 'ha' %}Zafi (°C){% elif user_lang == 'ig' %}Okpomọkụ (°C){% elif user_lang == 'yo' %}Ìyípo-òru (°C){% else %}Temperature (°C){% endif %}";
+  var humLabel = "{% if user_lang == 'ha' %}Danshi (%){% elif user_lang == 'ig' %}Iru mmiri (%){% elif user_lang == 'yo' %}Ìmọ̀-ọ̀rin (%){% else %}Humidity (%){% endif %}";
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const forecastData = JSON.parse("{{ forecast_data|escapejs }}");
+
+    const ctx = document.getElementById('forecastChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: forecastData.days,
+        datasets: [
+          {
+            label: tempLabel,
+            data: forecastData.temps,
+            borderColor: '#FF6B6B',
+            backgroundColor: 'rgba(255, 107, 107, 0.1)',
+            tension: 0.4,
+            fill: true,
+            yAxisID: 'y',
+          },
+          {
+            label: humLabel,
+            data: forecastData.humidity,
+            borderColor: '#4ECDC4',
+            backgroundColor: 'rgba(78, 205, 196, 0.1)',
+            tension: 0.4,
+            fill: true,
+            yAxisID: 'y1',
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+          },
+        },
+        scales: {
+          y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
+            title: {
+              display: true,
+              text: tempLabel,
+            },
+          },
+          y1: {
+            type: 'linear',
+            display: true,
+            position: 'right',
+            title: {
+              display: true,
+              text: humLabel,
+            },
+            grid: {
+              drawOnChartArea: false,
+            },
+          },
+        },
+      },
+    });
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card">
+  {% if show_welcome %}
+    <div style="background: #4CAF50; color: white; padding: 16px 20px; border-radius: 8px; margin-bottom: 20px; font-size: 16px; font-weight: 500; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+      🎉 <strong>Welcome to FarmBuddy!</strong> Let's start by telling us about your farm so we can give you the best advice.
+    </div>
+  {% endif %}
+  <h2>Tell us about your farm — Step 2 of 2</h2>
+  <p>This helps FarmBuddy give you advice that fits your farm. You can skip or update this later.</p>
+  
+  <form method="post">
+    {% csrf_token %}
+    
+    {% if form.non_field_errors %}
+      <ul class="errorlist">
+        {% for error in form.non_field_errors %}
+          <li>{{ error }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    
+    {% for field in form %}
+      {% if field.field.widget.input_type != 'hidden' %}
+        <div class="form-group">
+          {{ field.label_tag }}
+          {{ field }}
+          {% if field.errors %}
+            <ul class="errorlist">{% for error in field.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+          {% endif %}
+          {% if field.help_text %}<div class="help-text">{{ field.help_text|safe }}</div>{% endif %}
+        </div>
+      {% endif %}
+    {% endfor %}
+    
+    <div style="display: flex; gap: 12px;">
+      <button type="submit" class="btn">Save profile</button>
+      <a href="{% url 'index' %}" class="btn btn-link">Skip for now</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

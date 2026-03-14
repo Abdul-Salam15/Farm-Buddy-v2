@@ -1,0 +1,1019 @@
+"use client"
+
+import { useState, useEffect, useCallback, useRef } from "react"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet"
+import {
+  Send,
+  Plus,
+  MessageSquare,
+  Sprout,
+  Bug,
+  Droplets,
+  BookOpen,
+  Cloud,
+  Image as ImageIcon,
+  Mic,
+  User,
+  Settings,
+  LogOut,
+  Menu,
+  Leaf,
+  Moon,
+  Sun,
+  Pause,
+  Play,
+  Copy,
+  Check,
+  X,
+  Pencil,
+  Trash2,
+  Check as SaveIcon
+} from "lucide-react"
+import { useTheme } from "next-themes"
+import { cn } from "@/lib/utils"
+
+interface Message {
+  id: string | number
+  role: "user" | "assistant"
+  content: string
+  image_url?: string
+  references?: any[]
+}
+
+interface ConversationItem {
+  id: number
+  title: string
+  updated_at: string
+}
+
+const quickActions = [
+  { icon: Leaf, label: "Crop disease diagnosis" },
+  { icon: Droplets, label: "Irrigation advice" },
+  { icon: Sun, label: "Weather impact on farming" },
+  { icon: BookOpen, label: "Farming best practices" },
+]
+
+function FormattedMessage({ content }: { content: string }) {
+  // Split by [FARMBUDDY_REFS] to only show main content
+  const mainContent = content.split('[FARMBUDDY_REFS]')[0].trim();
+
+  // Basic markdown-like bold processing
+  const parts = mainContent.split(/(\*\*.*?\*\*)/g);
+
+  return (
+    <div className="whitespace-pre-wrap break-words">
+      {parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={i} className="font-bold underline decoration-primary/30 underline-offset-2">{part.slice(2, -2)}</strong>;
+        }
+        return part;
+      })}
+    </div>
+  );
+}
+
+export default function ChatPage() {
+  const [messages, setMessages] = useState<Message[]>([])
+  const [conversations, setConversations] = useState<ConversationItem[]>([])
+  const [currentConvId, setCurrentConvId] = useState<number | null>(null)
+  const [inputValue, setInputValue] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { theme, setTheme } = useTheme()
+  const [isSpeaking, setIsSpeaking] = useState<string | number | null>(null)
+  const [isPaused, setIsPaused] = useState(false)
+  const [copiedId, setCopiedId] = useState<string | number | null>(null)
+  const [selectedImage, setSelectedImage] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [preferredLanguage, setPreferredLanguage] = useState("en")
+  const [editingConvId, setEditingConvId] = useState<number | null>(null)
+  const [editingTitle, setEditingTitle] = useState("")
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const recognitionRef = useRef<any>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  const scrollToBottom = useCallback(() => {
+    if (scrollAreaRef.current) {
+      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]')
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, scrollToBottom])
+
+  const API_BASE = "http://localhost:8000/chat"
+
+  const fetchConversations = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/list/`, { credentials: 'include' })
+      const data = await res.json()
+      if (data.success) {
+        setConversations(data.conversations)
+      }
+    } catch (err) {
+      console.error("Failed to fetch conversations", err)
+    }
+  }, [])
+
+  const fetchUserProfile = useCallback(async () => {
+    try {
+      const res = await fetch(`http://localhost:8000/accounts/profile/`, {
+        headers: { 'Accept': 'application/json' },
+        credentials: 'include'
+      })
+      const data = await res.json()
+      if (data.success) {
+        setPreferredLanguage(data.profile.preferred_language || "en")
+      }
+    } catch (err) {
+      console.error("Failed to fetch user profile", err)
+    }
+  }, [])
+
+  const [weatherData, setWeatherData] = useState<any>(null)
+  const [isRecording, setIsRecording] = useState(false)
+
+  const handleMicClick = () => {
+    if (isRecording) {
+      recognitionRef.current?.stop()
+      setIsRecording(false)
+    } else {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+      if (!SpeechRecognition) {
+        alert("Speech recognition is not supported in this browser.")
+        return
+      }
+
+      const recognition = new SpeechRecognition()
+      recognitionRef.current = recognition
+
+      // Map preferred language to BCP-47 tags
+      const langMap: Record<string, string> = {
+        'en': 'en-US',
+        'ha': 'ha-NG',
+        'ig': 'ig-NG',
+        'yo': 'yo-NG',
+        'pcm': 'en-NG' // Pidgin fallback
+      }
+
+      recognition.lang = langMap[preferredLanguage] || 'en-US'
+      recognition.continuous = true
+      recognition.interimResults = true
+
+      recognition.onstart = () => {
+        setIsRecording(true)
+      }
+
+      recognition.onresult = (event: any) => {
+        let interimTranscript = ''
+        let finalTranscript = ''
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript
+          } else {
+            interimTranscript += event.results[i][0].transcript
+          }
+        }
+
+        if (finalTranscript || interimTranscript) {
+          setInputValue(prev => {
+            // Simply append or replace? GitHub logic replaces if it's a fresh start
+            // but we'll append to existing text just in case user typed something
+            return finalTranscript + interimTranscript
+          })
+        }
+      }
+
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error", event.error)
+        setIsRecording(false)
+      }
+
+      recognition.onend = () => {
+        setIsRecording(false)
+      }
+
+      recognition.start()
+    }
+  }
+
+  const playMessage = async (message: Message) => {
+    // If currently speaking this message
+    if (isSpeaking === message.id) {
+      if (audioRef.current) {
+        if (!isPaused) {
+          audioRef.current.pause()
+          setIsPaused(true)
+        } else {
+          audioRef.current.play()
+          setIsPaused(false)
+        }
+      }
+      return
+    }
+
+    // Stop and clear previous audio if switching messages
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
+
+    setIsSpeaking(message.id)
+    setIsPaused(false)
+
+    try {
+      // Use direct URL for streaming instead of fetching blob
+      const url = `${API_BASE}/api/speak/?text=${encodeURIComponent(message.content)}&language=en`
+      const audio = new Audio(url)
+      audioRef.current = audio
+      audio.onended = () => {
+        setIsSpeaking(null)
+        setIsPaused(false)
+        audioRef.current = null
+      }
+      audio.play()
+    } catch (err) {
+      console.error("TTS failed", err)
+      setIsSpeaking(null)
+    }
+  }
+
+  const handleWeatherClick = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser")
+      return
+    }
+
+    setIsLoading(true)
+    navigator.geolocation.getCurrentPosition(async (position) => {
+      try {
+        const { latitude, longitude } = position.coords
+        const res = await fetch(`${API_BASE}/api/weather/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: 'include',
+          body: JSON.stringify({ lat: latitude, lon: longitude }),
+        })
+        const data = await res.json()
+        if (data.success) {
+          setWeatherData(data.data)
+          setMessages(prev => [...prev, {
+            id: Date.now(),
+            role: "assistant",
+            content: `I've updated your farm's weather context. Currently: ${data.data.current.weather[0].description}, ${Math.round(data.data.current.main.temp)}°C. How can I help you today based on this?`
+          }])
+        }
+      } catch (err) {
+        console.error("Weather fetch failed", err)
+      } finally {
+        setIsLoading(false)
+      }
+    }, (err) => {
+      console.error("Geolocation error", err)
+      setIsLoading(false)
+      alert("Could not get your location. Please check permissions.")
+    })
+  }
+
+  const loadConversation = async (id: number) => {
+    try {
+      setIsLoading(true)
+      setMessages([]) // Clear current messages for immediate feedback
+      const res = await fetch(`${API_BASE}/api/history/${id}/`, { credentials: 'include' })
+      const data = await res.json()
+      if (data.success) {
+        setMessages(data.messages)
+        setCurrentConvId(id)
+        setSidebarOpen(false)
+        // Focus input after a short delay to ensure UI is ready
+        setTimeout(() => inputRef.current?.focus(), 100)
+      }
+    } catch (err) {
+      console.error("Failed to load conversation", err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const copyToClipboard = async (text: string, id: string | number) => {
+    try {
+      // Clean internal tags before copying
+      const cleanText = text.split('[FARMBUDDY_REFS]')[0].trim()
+      await navigator.clipboard.writeText(cleanText)
+      setCopiedId(id)
+      setTimeout(() => setCopiedId(null), 2000)
+    } catch (err) {
+      console.error("Failed to copy", err)
+    }
+  }
+
+  useEffect(() => {
+    fetchConversations()
+    fetchUserProfile()
+  }, [fetchConversations, fetchUserProfile])
+
+  const handleSend = async () => {
+    if ((!inputValue.trim() && !selectedImage) || isLoading) return
+
+    const tempUserMsg: Message = {
+      id: Date.now(),
+      role: "user",
+      content: inputValue || (selectedImage ? "[Plant image uploaded for analysis]" : ""),
+      image_url: previewUrl || undefined
+    }
+
+    setMessages(prev => [...prev, tempUserMsg])
+    const messageToSend = inputValue
+    const imageToSend = selectedImage
+
+    setInputValue("")
+    setSelectedImage(null)
+    setPreviewUrl(null)
+    setUploadProgress(0)
+    setIsLoading(true)
+
+    try {
+      let response;
+      if (imageToSend) {
+        const formData = new FormData()
+        if (messageToSend) formData.append('message', messageToSend)
+        formData.append('image', imageToSend)
+        if (currentConvId) formData.append('conversation_id', currentConvId.toString())
+
+        response = await fetch(`${API_BASE}/upload/`, {
+          method: "POST",
+          credentials: 'include',
+          body: formData,
+        })
+      } else {
+        response = await fetch(`${API_BASE}/send/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: 'include',
+          body: JSON.stringify({
+            message: messageToSend,
+            conversation_id: currentConvId,
+            language: preferredLanguage
+          }),
+        })
+      }
+
+      if (!response.body) throw new Error("No response body")
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let assistantContent = ""
+      let assistantMsgId = Date.now() + 1
+
+      // Add placeholder for assistant message
+      setMessages(prev => [...prev, { id: assistantMsgId, role: "assistant", content: "" }])
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split("\n").filter(l => l.trim())
+
+        for (const line of lines) {
+          try {
+            const data = JSON.parse(line)
+            if (data.chunk) {
+              assistantContent += data.chunk
+              setMessages(prev => prev.map(m =>
+                m.id === assistantMsgId ? { ...m, content: assistantContent } : m
+              ))
+            }
+            if (data.success) {
+              if (data.conversation_id && !currentConvId) {
+                setCurrentConvId(data.conversation_id)
+                fetchConversations()
+              }
+              // Update with final content and references if any
+              if (data.full_text) {
+                setMessages(prev => prev.map(m =>
+                  m.id === assistantMsgId ? { ...m, content: data.full_text, references: data.references } : m
+                ))
+              }
+            }
+          } catch (e) {
+            console.warn("Error parsing NDJSON line", e)
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Chat error:", error)
+      setMessages(prev => [...prev, {
+        id: Date.now() + 2,
+        role: "assistant",
+        content: "Sorry, I encountered an error connecting to the server."
+      }])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleNewChat = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/new/`, { method: "POST", credentials: "include" })
+      const data = await res.json()
+      if (data.success) {
+        setMessages([])
+        setCurrentConvId(data.conversation_id)
+        fetchConversations()
+        setSidebarOpen(false)
+      }
+    } catch (err) {
+      console.error("Failed to create new chat", err)
+    }
+  }
+
+  const handleDeleteConversation = async (e: React.MouseEvent, id: number) => {
+    e.stopPropagation()
+    if (!confirm("Are you sure you want to delete this chat?")) return
+
+    try {
+      const res = await fetch(`${API_BASE}/api/delete/${id}/`, {
+        method: "POST", // Backend supports both POST and DELETE
+        credentials: "include",
+      })
+      const data = await res.json()
+      if (data.success) {
+        if (currentConvId === id) {
+          setMessages([])
+          setCurrentConvId(null)
+        }
+        fetchConversations()
+      }
+    } catch (err) {
+      console.error("Failed to delete conversation", err)
+    }
+  }
+
+  const startRename = (e: React.MouseEvent, conv: ConversationItem) => {
+    e.stopPropagation()
+    setEditingConvId(conv.id)
+    setEditingTitle(conv.title)
+  }
+
+  const handleRename = async (e: React.FormEvent | React.MouseEvent) => {
+    if (e) {
+      if ('preventDefault' in e) e.preventDefault()
+      if ('stopPropagation' in e) e.stopPropagation()
+    }
+    
+    if (!editingConvId || !editingTitle.trim()) return
+
+    try {
+      const res = await fetch(`${API_BASE}/api/rename/${editingConvId}/`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: editingTitle.trim() }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setConversations(prev =>
+          prev.map(c => c.id === editingConvId ? { ...c, title: data.title } : c)
+        )
+        setEditingConvId(null)
+      }
+    } catch (err) {
+      console.error("Failed to rename conversation", err)
+    }
+  }
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const onImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || isLoading) return
+
+    setSelectedImage(file)
+    const url = URL.createObjectURL(file)
+    setPreviewUrl(url)
+
+    // Focus input to allow adding text
+    setTimeout(() => inputRef.current?.focus(), 100)
+
+    // Reset file input so same file can be selected again
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+  const handleQuickAction = (action: string) => {
+    setInputValue(action)
+  }
+
+  const handleLogout = async () => {
+    try {
+      await fetch("http://localhost:8000/accounts/logout/", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      })
+      window.location.href = "/login"
+    } catch (err) {
+      console.error("Logout failed", err)
+      window.location.href = "/login"
+    }
+  }
+
+  const SidebarContent = () => (
+    <div className="flex h-full flex-col">
+      <div className="flex items-center gap-3 p-5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary">
+          <Sprout className="h-5 w-5 text-sidebar-primary-foreground" />
+        </div>
+        <span className="text-lg font-semibold text-sidebar-foreground">FarmBuddy</span>
+      </div>
+
+      <div className="px-4 pb-4">
+        <Button
+          className="w-full justify-start gap-2"
+          onClick={handleNewChat}
+        >
+          <Plus className="h-4 w-4" />
+          New Chat
+        </Button>
+      </div>
+
+      <ScrollArea className="flex-1 px-4">
+        <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
+          Recent
+        </p>
+        <div className="space-y-1">
+          {conversations.length > 0 ? (
+            conversations.map((conv) => (
+              <div key={conv.id} className="group relative">
+                {editingConvId === conv.id ? (
+                  <form 
+                    onSubmit={handleRename}
+                    className="flex w-full items-center gap-1 rounded-lg bg-sidebar-accent px-2 py-1"
+                  >
+                    <Input
+                      autoFocus
+                      value={editingTitle}
+                      onChange={(e) => setEditingTitle(e.target.value)}
+                      className="h-8 flex-1 border-none bg-transparent px-1 text-sm focus-visible:ring-0"
+                    />
+                    <Button
+                      type="submit"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-green-500 hover:bg-green-500/10"
+                    >
+                      <SaveIcon className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-red-500 hover:bg-red-500/10"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setEditingConvId(null)
+                      }}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </form>
+                ) : (
+                  <button
+                    onClick={() => loadConversation(conv.id)}
+                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors ${currentConvId === conv.id
+                        ? "bg-sidebar-accent text-sidebar-foreground pr-16"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground pr-16"
+                      }`}
+                  >
+                    <MessageSquare className="h-4 w-4 shrink-0 opacity-70" />
+                    <span className="truncate text-left">{conv.title}</span>
+                    
+                    <div className={cn(
+                      "absolute right-2 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100",
+                      currentConvId === conv.id && "opacity-100"
+                    )}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                        onClick={(e) => startRename(e, conv)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-sidebar-foreground/50 hover:bg-red-500/10 hover:text-red-500"
+                        onClick={(e) => handleDeleteConversation(e, conv.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </button>
+                )}
+              </div>
+            ))
+          ) : (
+            <p className="py-8 text-center text-sm text-sidebar-foreground/40">
+              No conversations yet
+            </p>
+          )}
+        </div>
+      </ScrollArea>
+
+      <div className="border-t border-sidebar-border p-4">
+        <div className="space-y-1">
+          <Link
+            href="/profile"
+            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
+          >
+            <User className="h-4 w-4 opacity-70" />
+            My Farm
+          </Link>
+          <Link
+            href="/settings"
+            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
+          >
+            <Settings className="h-4 w-4 opacity-70" />
+            Settings
+          </Link>
+          <button
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
+          >
+            {theme === "dark" ? (
+              <Sun className="h-4 w-4 opacity-70" />
+            ) : (
+              <Moon className="h-4 w-4 opacity-70" />
+            )}
+            {theme === "dark" ? "Light Mode" : "Dark Mode"}
+          </button>
+          <button
+            onClick={handleLogout}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-red-400 transition-colors hover:bg-sidebar-accent"
+          >
+            <LogOut className="h-4 w-4 opacity-70" />
+            Logout
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="flex h-screen bg-background">
+      {/* Desktop Sidebar */}
+      <aside className="hidden w-64 shrink-0 bg-sidebar lg:block">
+        <SidebarContent />
+      </aside>
+
+      {/* Mobile Sidebar */}
+      <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+        <SheetContent side="left" className="w-72 bg-sidebar p-0">
+          <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+          <SheetDescription className="sr-only">
+            Access your chats, farm profile, and settings
+          </SheetDescription>
+          <SidebarContent />
+        </SheetContent>
+      </Sheet>
+
+      {/* Main Content */}
+      <div className="flex flex-1 flex-col">
+        {/* Header */}
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card px-4">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-sm font-medium">Agricultural Advisor</h1>
+              <p className="text-xs text-muted-foreground">Voice-Enabled AI</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="hidden lg:flex"
+            >
+              <Sun className="h-4 w-4 rotate-0 scale-100 transition-transform dark:-rotate-90 dark:scale-0" />
+              <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-transform dark:rotate-0 dark:scale-100" />
+            </Button>
+            <Link href="/profile">
+              <Button variant="outline" size="sm" className="gap-2">
+                <User className="h-4 w-4" />
+                <span className="hidden sm:inline">My Farm</span>
+              </Button>
+            </Link>
+          </div>
+        </header>
+
+        {/* Chat Area */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <ScrollArea className="flex-1 h-full" ref={scrollAreaRef}>
+            <div className="mx-auto max-w-3xl px-4 py-8">
+              {messages.length === 0 ? (
+                <div className="flex flex-col items-center py-8">
+                  <div className="mb-6 rounded-2xl bg-accent/50 p-6">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary">
+                      <Sprout className="h-8 w-8 text-primary-foreground" />
+                    </div>
+                  </div>
+                  <h2 className="mb-2 text-2xl font-bold">Welcome to FarmBuddy!</h2>
+                  <p className="mb-8 max-w-md text-center text-muted-foreground">
+                    {"I'm your AI agricultural advisor for Nigerian smallholder farmers. Ask me anything about:"}
+                  </p>
+
+                  <div className="grid w-full max-w-lg grid-cols-1 gap-3 sm:grid-cols-2">
+                    {quickActions.map((action) => (
+                      <button
+                        key={action.label}
+                        onClick={() => handleQuickAction(action.label)}
+                        className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-primary hover:bg-accent"
+                      >
+                        <action.icon className="h-5 w-5 shrink-0 text-primary" />
+                        <span className="text-sm font-medium">{action.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {messages.map((message, idx) => (
+                    <div
+                      key={message.id || idx}
+                      className={cn(
+                        "flex w-full mb-6",
+                        message.role === "user" ? "justify-end" : "justify-start"
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "relative max-w-[85%] rounded-3xl px-5 py-4 shadow-sm transition-all duration-300",
+                          message.role === "user"
+                            ? "bg-gradient-to-br from-primary via-primary/90 to-primary/80 text-primary-foreground rounded-tr-none shadow-lg shadow-primary/10"
+                            : "bg-card border border-border/50 text-card-foreground rounded-tl-none hover:shadow-md"
+                        )}
+                      >
+                        {message.image_url && (
+                          <div className="mb-3 overflow-hidden rounded-2xl bg-muted/20">
+                            <img
+                              src={message.image_url.startsWith('blob:') || message.image_url.startsWith('data:') || message.image_url.startsWith('http')
+                                ? message.image_url
+                                : `http://localhost:8000${message.image_url}`
+                              }
+                              alt="Uploaded visual"
+                              className="max-h-80 w-full object-contain transition-transform hover:scale-[1.02] cursor-pointer"
+                              onClick={() => window.open(message.image_url?.startsWith('blob:') ? message.image_url : `http://localhost:8000${message.image_url}`, '_blank')}
+                            />
+                          </div>
+                        )}
+
+                        <div className="text-sm leading-relaxed sm:text-base">
+                          <FormattedMessage content={message.content} />
+                        </div>
+
+                        {message.role === "assistant" && (
+                          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border/50 pt-4">
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="h-9 gap-2 text-xs font-semibold bg-accent/50 hover:bg-accent"
+                                onClick={() => playMessage(message)}
+                              >
+                                {isSpeaking === message.id ? (
+                                  isPaused ? (
+                                    <>
+                                      <Play className="h-3.5 w-3.5" />
+                                      Resume
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Pause className="h-3.5 w-3.5 animate-pulse" />
+                                      Pause
+                                    </>
+                                  )
+                                ) : (
+                                  <>
+                                    <Mic className="h-3.5 w-3.5" />
+                                    Listen
+                                  </>
+                                )}
+                              </Button>
+
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-9 w-9 p-0"
+                                onClick={() => copyToClipboard(message.content, message.id)}
+                                title="Copy response"
+                              >
+                                {copiedId === message.id ? (
+                                  <Check className="h-4 w-4 text-green-500" />
+                                ) : (
+                                  <Copy className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground italic">
+                              Response generated by FarmBuddy
+                            </span>
+                          </div>
+                        )}
+
+                        {message.references && message.references.length > 0 && (
+                          <div className="mt-4 rounded-2xl bg-primary/5 p-4 border border-primary/10 shadow-inner">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Sprout className="h-4 w-4 text-primary" />
+                              <p className="text-[11px] font-bold uppercase tracking-widest text-primary">Sources & Context</p>
+                            </div>
+                            <ul className="space-y-3">
+                              {message.references.map((ref: any, idx: number) => (
+                                <li key={idx} className="text-[12px] leading-relaxed text-muted-foreground flex gap-3 group">
+                                  <div className="shrink-0 mt-1 h-1.5 w-1.5 rounded-full bg-primary/40 group-hover:bg-primary/60 transition-colors" />
+                                  <span>
+                                    <strong className="text-foreground/80 font-bold uppercase text-[10px] block mb-0.5 tracking-tight">
+                                      {ref.type === 'profile' ? 'From Your Farm Profile' : 'Continuing Conversation'} ({ref.key}):
+                                    </strong>{" "}
+                                    {ref.explanation}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {isLoading && (
+                    <div className="flex gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary">
+                        <Sprout className="h-4 w-4 text-primary-foreground" />
+                      </div>
+                      <div className="rounded-2xl border border-border bg-card px-4 py-3">
+                        <div className="flex gap-1.5">
+                          <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
+                          <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
+                          <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+
+          {/* Input Area */}
+          <div className="shrink-0 border-t border-border bg-card p-4">
+            <div className="mx-auto max-w-3xl">
+              {/* Image Staging Area */}
+              {previewUrl && (
+                <div className="relative mb-4 group inline-block">
+                  <div className="relative overflow-hidden rounded-2xl border-2 border-primary/20 shadow-xl">
+                    <img
+                      src={previewUrl}
+                      alt="Staged"
+                      className="h-32 w-auto object-cover transition-opacity duration-300 group-hover:opacity-90"
+                    />
+                    {isLoading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+                        <div className="relative h-12 w-12">
+                          <svg className="h-full w-full" viewBox="0 0 36 36">
+                            <circle
+                              className="stroke-white/20"
+                              strokeWidth="3"
+                              fill="transparent"
+                              r="16"
+                              cx="18"
+                              cy="18"
+                            />
+                            <circle
+                              className="stroke-primary animate-[dash_1.5s_ease-in-out_infinite]"
+                              strokeWidth="3"
+                              strokeLinecap="round"
+                              strokeDasharray="100"
+                              fill="transparent"
+                              r="16"
+                              cx="18"
+                              cy="18"
+                            />
+                          </svg>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Leaf className="h-4 w-4 text-primary animate-pulse" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {!isLoading && (
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="absolute -right-2 -top-2 h-7 w-7 rounded-full shadow-lg transition-transform hover:scale-110"
+                      onClick={() => {
+                        setSelectedImage(null)
+                        setPreviewUrl(null)
+                      }}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <div className="hidden shrink-0 gap-1 sm:flex">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-10 w-10 text-muted-foreground hover:text-foreground"
+                    onClick={handleWeatherClick}
+                  >
+                    <Cloud className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-10 w-10 text-muted-foreground hover:text-foreground"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <ImageIcon className="h-5 w-5" />
+                  </Button>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="image/*"
+                    onChange={onImageSelect}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`h-10 w-10 ${isRecording ? 'text-red-500 bg-red-50' : 'text-muted-foreground'} hover:text-foreground`}
+                    onClick={handleMicClick}
+                  >
+                    <Mic className={`h-5 w-5 ${isRecording ? 'animate-pulse' : ''}`} />
+                  </Button>
+                </div>
+
+                <div className="relative flex-1">
+                  <Input
+                    ref={inputRef}
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault()
+                        handleSend()
+                      }
+                    }}
+                    placeholder="Type, speak, or upload an image..."
+                    className="h-12 w-full rounded-xl border-border bg-background pr-4 pl-4 text-foreground placeholder:text-muted-foreground"
+                  />
+                </div>
+                <Button
+                  onClick={handleSend}
+                  disabled={(!inputValue.trim() && !selectedImage) || isLoading}
+                  size="icon"
+                  className="h-12 w-12 shrink-0 rounded-xl"
+                >
+                  <Send className="h-5 w-5" />
+                </Button>
+              </div>
+              {/* Mobile action buttons */}
+              <div className="mx-auto mt-3 flex max-w-3xl justify-center gap-2 sm:hidden">
+                <Button variant="outline" size="icon" className="h-9 w-9 text-muted-foreground" onClick={handleWeatherClick}>
+                  <Cloud className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="icon" className="h-9 w-9 text-muted-foreground">
+                  <ImageIcon className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="icon" className="h-9 w-9 text-muted-foreground">
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

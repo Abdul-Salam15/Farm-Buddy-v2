@@ -18,7 +18,7 @@ This project is a monorepo consisting of:
 | Category | Feature | Description |
 |---|---|---|
 | 🤖 **AI Advice** | **Personalized Chat** | Get agricultural advice tailored to your farm's size, soil, and pest history. |
-| 🌍 **Localization** | **5 Languages** | Full support for English, Hausa (ha), Igbo (ig), Yoruba (yo), and Pidgin (pcm). |
+| 🌍 **Localization** | **4 Languages** | Full support for English, Hausa (ha), Igbo (ig), and Yoruba (yo). |
 | 📸 **Vision** | **Plant Diagnosis** | Upload a leaf photo; Gemini Vision identifies diseases and suggests treatments. |
 | 🔊 **Audio** | **Voice I/O** | Speak questions (Gemini STT) and listen to replies (YarnGPT TTS with Nigerian accents). |
 | 🌦️ **Weather** | **Contextual Forecasts** | Real-time weather data is automatically fed into AI advice and dashboard charts. |
@@ -90,7 +90,7 @@ The FarmBuddy bot (@FarmBuddyAI_Bot) allows full management of your farm:
     - `/dashboard`: See your farm stats (Size, Soil, Pests).
     - `/forecast`: Get a 7-day weather chart as an image.
     - `/edit_profile`: Update your farm data directly from Telegram.
-    - `/language`: Switch between English, Hausa, Igbo, Yoruba, and Pidgin.
+    - `/language`: Switch between English, Hausa, Igbo, and Yoruba.
 - **AI Chat**: Send text or voice notes directly to the bot for agricultural support.
 - **Plant Diagnosis**: Send a leaf photo to the bot for instant identification.
 

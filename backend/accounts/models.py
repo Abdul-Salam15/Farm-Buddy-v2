@@ -32,13 +32,13 @@ class FarmerProfile(models.Model):
         ('ha', 'Hausa'),
         ('ig', 'Igbo'),
         ('yo', 'Yoruba'),
-        ('pcm', 'Pidgin'),
     ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     preferred_language = models.CharField(max_length=5, choices=LANGUAGE_CHOICES, default='en')
     first_name = models.CharField(max_length=150, null=True, blank=True)
     last_name = models.CharField(max_length=150, null=True, blank=True)
+    phone_number = models.CharField(max_length=20, null=True, blank=True)
     location = models.CharField(max_length=200, null=True, blank=True, help_text='Town, state or region')
     farm_size_acres = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0.0)])
     soil_type = models.CharField(max_length=20, choices=SOIL_CHOICES, default='unknown')

@@ -42,11 +42,7 @@ TIPS = {
         "Ṣayẹwo ọrinrin ile ṣaaju ki o to fun omi.",
         "Lo compost lati jẹ ki ile rẹ jẹ ọlọrọ nipa ti ara.",
     ],
-    'pcm': [
-        "Water your crops for early morning make water no dry quick.",
-        "Check if soil get water before you pour more.",
-        "Use compost make your soil get power naturally.",
-    ]
+
 }
 
 def get_daily_tip(lang):

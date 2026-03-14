@@ -225,7 +225,7 @@ export default function SettingsPage() {
                       <SelectItem value="ha">Hausa</SelectItem>
                       <SelectItem value="ig">Igbo</SelectItem>
                       <SelectItem value="yo">Yoruba</SelectItem>
-                      <SelectItem value="pcm">Pidgin</SelectItem>
+
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">

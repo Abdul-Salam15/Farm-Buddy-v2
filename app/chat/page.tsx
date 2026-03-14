@@ -91,6 +91,7 @@ export default function ChatPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [preferredLanguage, setPreferredLanguage] = useState("en")
+  const audioPlayerKey = preferredLanguage;
   const [editingConvId, setEditingConvId] = useState<number | null>(null)
   const [editingTitle, setEditingTitle] = useState("")
   const scrollAreaRef = useRef<HTMLDivElement>(null)
@@ -163,7 +164,6 @@ export default function ChatPage() {
         'ha': 'ha-NG',
         'ig': 'ig-NG',
         'yo': 'yo-NG',
-        'pcm': 'en-NG' // Pidgin fallback
       }
 
       recognition.lang = langMap[preferredLanguage] || 'en-US'

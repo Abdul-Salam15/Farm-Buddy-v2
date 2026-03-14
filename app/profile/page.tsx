@@ -327,7 +327,7 @@ export default function ProfilePage() {
                           <SelectItem value="yo">Yoruba</SelectItem>
                           <SelectItem value="ig">Igbo</SelectItem>
                           <SelectItem value="ha">Hausa</SelectItem>
-                          <SelectItem value="pcm">Pidgin</SelectItem>
+
                         </SelectContent>
                       </Select>
                     </div>

@@ -331,12 +331,6 @@ def get_localized_labels(lang):
             'btn_login': "🔑 Wọle",
             'btn_signup': "📝 Forukọsilẹ",
             'btn_forgot': "❓ Gbagbe ọrọ igbaniwọle",
-            'btn_link': "🔗 Sopọ mọ Webụ",
-            'prompt_username': "Tẹ **orukọ olumulo** rẹ:",
-            'prompt_password': "Tẹ **ọrọ igbaniwọle** rẹ:",
-            'prompt_grandfather': "🛡️ **Ìbéèrè Ààbò**: Kí ni orúkọ bàbá bàbá rẹ?",
-            'prompt_new_password': "Tẹ **ọrọ igbaniwọle tuntun** rẹ (o kere ju awọn lẹta 6):",
-            'auth_success': "✅ Wọle ni aṣeyọri! Kaabo pada, {name}.",
             'auth_failed': "❌ Orukọ olumulo tabi ọrọ igbaniwọle ko tọ. Jọwọ gbiyanju lẹẹkansii tabi lo /start.",
             'reset_success': "✅ Ntọala ọrọ igbaniwọle ni aṣeyọri! O le wọle bayi pẹlu ọrọ igbaniwọle tuntun rẹ.",
             'reset_failed': "❌ Idahun ko tọ. Atunṣe ọrọ igbaniwọle kuna.",
@@ -352,61 +346,6 @@ def get_localized_labels(lang):
             'user_exists': "❌ Orukọ yii ti wa tẹlẹ. Jọwọ gbiyanju orukọ miiran:",
             'signup_done': "🎉 A ti ṣẹda akọọlẹ rẹ ni aṣeyọri! O le lo FarmBuddy ni bayi.",
             'connect_info': "Lati lo FarmBuddy lori Telegram, o le:\n\n1. Lo bọtini **'Open Telegram'** lori oju opo wẹẹbu 'My Farm'.\n2. **Wọle (Log in)** taara nibi ti o ba ti ni akọọlẹ tẹlẹ.\n3. **Forukọsilẹ (Sign up)** lati ṣẹda akọọlẹ tuntun.",
-        },
-        'pcm': {
-            'dash_header': "📊 **Your Farm Dashboard**",
-            'name': "Name",
-            'location': "Location",
-            'soil_type': "Soil Type",
-            'farm_size': "Farm Size",
-            'tip_header': "💡 **Daily Agricultural Tip**",
-            'not_linked': "❌ Your account no link. Use /start to link am.",
-            'acres': "acres",
-            'welcome_back': "Welcome back, {name}! How I fit help you today?\n\nCommands:\n/dashboard - View farm summary\n/tip - Get daily advice\n/forecast - View weekly weather graph\n/language - Change language\n/edit_profile - Update farm data",
-            'analyzing_photo': "📸 I de check your leaf photo... wait small.",
-            'no_location': "📍 Location no set. Abeg set your location for website make I fit show you weather.",
-            'forecast_title': "7-Day Weather Forecast",
-            'temp': "Temp (°C)",
-            'humidity': "Humidity (%)",
-            'edit_start': "📝 Make we update your farm profile. Which **place** your farm de? (e.g. 'Lagos')",
-            'edit_size': "📐 Correct! How big your **farm size** be for acres? (Send only number, or 0 if you no sure)",
-            'edit_soil': "🌱 We almost done! Which **soil type** you get?",
-            'edit_desc': "📝 How you fit **describe** your soil? (e.g. 'E dark and rich')",
-            'edit_done': "✅ Thank you! I don update your farm profile.",
-            'cancel': "❌ I don stop the update.",
-            'loamy': "Loamy",
-            'sandy': "Sandy",
-            'clay': "Clay",
-            'silty': "Silty",
-            'not_sure': "I no sure",
-            'select_language': "🌍 **Select the language you like:**",
-            'language_changed': "✅ I don change language to **Pidgin**. All messages go de come in Pidgin now.",
-            'logout_success': "✅ You don logout. Your account no link to this Telegram again.",
-            'auth_welcome': "Welcome to FarmBuddy! 🌾\n\nAbeg pick one option to start:",
-            'btn_login': "🔑 Login",
-            'btn_signup': "📝 Sign Up",
-            'btn_forgot': "❓ Forgot Password",
-            'btn_link': "🔗 Link Web Account",
-            'prompt_username': "Enter your **username**:",
-            'prompt_password': "Enter your **password**:",
-            'prompt_grandfather': "🛡️ **Security Question**: Wetin be your grand father name?",
-            'prompt_new_password': "Enter your **new password** (at least 6 characters):",
-            'auth_success': "✅ Login success! Welcome back, {name}.",
-            'auth_failed': "❌ Username or password no correct. Try again or use /start.",
-            'reset_success': "✅ Password reset success! You fit login with your new password now.",
-            'reset_failed': "❌ Answer no correct. Password reset fail.",
-            'user_not_found': "❌ I no find that username.",
-            'signup_user': "Correct! Make we create your account. Which **username** you wan use?",
-            'signup_pass': "Pick **strong password** (at least 6 characters):",
-            'signup_name': "Wetin be your **full name**?",
-            'signup_loc': "Which **town and state** your farm de?",
-            'signup_size': "How big your **farm size** be for acres? (Send only number)",
-            'signup_soil': "Which **soil type** you get?",
-            'signup_pests': "Which **pests or diseases** you de see for your farm? (e.g. armyworms, aphids)",
-            'signup_lang': "Which **language** you like pass?",
-            'user_exists': "❌ Another person don use this username. Abeg try another one:",
-            'signup_done': "🎉 Account created success! You fit use FarmBuddy now.",
-            'connect_info': "To use FarmBuddy for Telegram, you fit:\n\n1. Use the **'Open Telegram'** button for website 'My Farm' page.\n2. **Log in** directly here if you already get account.\n3. **Sign up** to create new account.",
         }
     }
     return labels.get(lang, labels['en'])
@@ -438,11 +377,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             welcome = l['welcome_back'].format(name=info['username'])
             await update.message.reply_text(welcome)
         else:
-            # Handle unlinked users - Language selection first
             keyboard = [
                 [InlineKeyboardButton("English 🇬🇧", callback_data='onboard_lang_en'), InlineKeyboardButton("Hausa 🇳🇬", callback_data='onboard_lang_ha')],
-                [InlineKeyboardButton("Igbo 🇳🇬", callback_data='onboard_lang_ig'), InlineKeyboardButton("Yoruba 🇳🇬", callback_data='onboard_lang_yo')],
-                [InlineKeyboardButton("Pidgin 🇳🇬", callback_data='onboard_lang_pcm')]
+                [InlineKeyboardButton("Igbo 🇳🇬", callback_data='onboard_lang_ig'), InlineKeyboardButton("Yoruba 🇳🇬", callback_data='onboard_lang_yo')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text("🌍 **Please select your language** / **Jọwọ yan asụsụ gị** / **Zaɓi yarenku**:", reply_markup=reply_markup)
@@ -661,8 +598,7 @@ async def signup_pests(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard = [
         [InlineKeyboardButton("English 🇬🇧", callback_data='su_lang_en'), InlineKeyboardButton("Hausa 🇳🇬", callback_data='su_lang_ha')],
-        [InlineKeyboardButton("Igbo 🇳🇬", callback_data='su_lang_ig'), InlineKeyboardButton("Yoruba 🇳🇬", callback_data='su_lang_yo')],
-        [InlineKeyboardButton("Pidgin 🇳🇬", callback_data='su_lang_pcm')]
+        [InlineKeyboardButton("Igbo 🇳🇬", callback_data='su_lang_ig'), InlineKeyboardButton("Yoruba 🇳🇬", callback_data='su_lang_yo')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(l['signup_lang'], reply_markup=reply_markup)
@@ -770,8 +706,7 @@ async def language_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
         l = get_localized_labels(info['lang'])
         keyboard = [
             [InlineKeyboardButton("English 🇬🇧", callback_data='lang_en'), InlineKeyboardButton("Hausa 🇳🇬", callback_data='lang_ha')],
-            [InlineKeyboardButton("Igbo 🇳🇬", callback_data='lang_ig'), InlineKeyboardButton("Yoruba 🇳🇬", callback_data='lang_yo')],
-            [InlineKeyboardButton("Pidgin 🇳🇬", callback_data='lang_pcm')]
+            [InlineKeyboardButton("Igbo 🇳🇬", callback_data='lang_ig'), InlineKeyboardButton("Yoruba 🇳🇬", callback_data='lang_yo')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(l['select_language'], reply_markup=reply_markup, parse_mode='Markdown')

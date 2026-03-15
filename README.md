@@ -84,7 +84,7 @@ FarmBuddy is designed to work in areas with low or no connectivity:
 
 ## Telegram Bot Integration
 
-The FarmBuddy bot (@FarmBuddyAI_Bot) allows full management of your farm:
+The FarmBuddy bot (@myfarmbuddy_bot) allows full management of your farm:
 - **Commands**: 
     - `/start`: Select language and Login/Sign up.
     - `/dashboard`: See your farm stats (Size, Soil, Pests).

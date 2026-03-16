@@ -1,4 +1,6 @@
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import os
 from collections import Counter
 from dotenv import load_dotenv
@@ -9,6 +11,22 @@ load_dotenv()
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 BASE_URL_WEATHER = "https://api.openweathermap.org/data/2.5/weather"
 BASE_URL_FORECAST = "https://api.openweathermap.org/data/2.5/forecast"
+WEATHER_TIMEOUT = 10  # seconds
+
+# Setup a session with retries
+def get_weather_session():
+    session = requests.Session()
+    retry = Retry(
+        total=3,
+        backoff_factor=0.5,
+        status_forcelist=[500, 502, 503, 504],
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+weather_session = get_weather_session()
 
 def get_weather(lat, lon):
     """
@@ -24,13 +42,17 @@ def get_weather(lat, lon):
             "appid": OPENWEATHER_API_KEY,
             "units": "metric"  # Celsius
         }
-        response = requests.get(BASE_URL_WEATHER, params=params)
+        response = weather_session.get(BASE_URL_WEATHER, params=params, timeout=WEATHER_TIMEOUT)
         response.raise_for_status()
         return response.json()
+    except requests.exceptions.Timeout:
+        return {"error": "Weather service connection timed out. Please try again later."}
+    except requests.exceptions.ConnectionError:
+        return {"error": "Could not connect to the weather service. Please check your internet connection."}
     except requests.exceptions.HTTPError as http_err:
-        return {"error": f"HTTP error occurred: {http_err}"}
+        return {"error": f"Weather service error: {http_err.response.status_code}"}
     except Exception as err:
-        return {"error": f"An error occurred: {err}"}
+        return {"error": f"An unexpected error occurred: {err}"}
 
 def get_forecast(lat, lon):
     """
@@ -46,11 +68,15 @@ def get_forecast(lat, lon):
             "appid": OPENWEATHER_API_KEY,
             "units": "metric"
         }
-        response = requests.get(BASE_URL_FORECAST, params=params)
+        response = weather_session.get(BASE_URL_FORECAST, params=params, timeout=WEATHER_TIMEOUT)
         response.raise_for_status()
         return response.json()
+    except requests.exceptions.Timeout:
+        return {"error": "Forecast service connection timed out."}
+    except requests.exceptions.ConnectionError:
+        return {"error": "Could not connect to the forecast service."}
     except requests.exceptions.HTTPError as http_err:
-        return {"error": f"HTTP error: {http_err}"}
+        return {"error": f"Forecast service error: {http_err.response.status_code}"}
     except Exception as err:
         return {"error": f"Error: {err}"}
 
@@ -67,11 +93,15 @@ def get_weather_by_city(city_name):
             "appid": OPENWEATHER_API_KEY,
             "units": "metric"
         }
-        response = requests.get(BASE_URL_WEATHER, params=params)
+        response = weather_session.get(BASE_URL_WEATHER, params=params, timeout=WEATHER_TIMEOUT)
         response.raise_for_status()
         return response.json()
+    except requests.exceptions.Timeout:
+        return {"error": f"Connection to weather service timed out while searching for '{city_name}'."}
+    except requests.exceptions.ConnectionError:
+        return {"error": "Could not connect to the weather service."}
     except requests.exceptions.HTTPError:
-        return {"error": f"City '{city_name}' not found or API error."}
+        return {"error": f"City '{city_name}' not found or weather service error."}
     except Exception as err:
         return {"error": f"Error: {err}"}
 
@@ -88,11 +118,15 @@ def get_forecast_by_city(city_name):
             "appid": OPENWEATHER_API_KEY,
             "units": "metric"
         }
-        response = requests.get(BASE_URL_FORECAST, params=params)
+        response = weather_session.get(BASE_URL_FORECAST, params=params, timeout=WEATHER_TIMEOUT)
         response.raise_for_status()
         return response.json()
+    except requests.exceptions.Timeout:
+        return {"error": f"Connection to forecast service timed out while searching for '{city_name}'."}
+    except requests.exceptions.ConnectionError:
+        return {"error": "Could not connect to the forecast service."}
     except requests.exceptions.HTTPError:
-        return {"error": f"City '{city_name}' not found or API error."}
+        return {"error": f"City '{city_name}' not found or forecast service error."}
     except Exception as err:
         return {"error": f"Error: {err}"}
 

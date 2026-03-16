@@ -19,9 +19,12 @@ import {
   Save,
   Globe,
   Shield,
+  LogOut,
 } from "lucide-react"
+import { useTranslation } from "@/app/i18n/LanguageContext"
 
 export default function SettingsPage() {
+  const { t, setLanguage } = useTranslation()
   const [settingsData, setSettingsData] = useState({
     first_name: "",
     last_name: "",
@@ -56,6 +59,9 @@ export default function SettingsPage() {
             last_name: data.user.last_name,
             preferred_language: data.user.preferred_language
           })
+          if (data.user.preferred_language) {
+            setLanguage(data.user.preferred_language)
+          }
         } else {
           router.push("/login")
         }
@@ -66,7 +72,7 @@ export default function SettingsPage() {
       }
     }
     fetchSettings()
-  }, [router])
+  }, [router, setLanguage])
 
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -83,13 +89,16 @@ export default function SettingsPage() {
       })
       const data = await response.json()
       if (data.success) {
-        alert("Profile updated successfully!")
+        if (settingsData.preferred_language) {
+          setLanguage(settingsData.preferred_language)
+        }
+        alert(t('settings.alert_profile_success'))
       } else {
-        alert("Error: " + JSON.stringify(data.errors || data.error))
+        alert(t('settings.alert_profile_error', { errors: JSON.stringify(data.errors || data.error) }))
       }
     } catch (error) {
       console.error("Profile save failed", error)
-      alert("Failed to save profile.")
+      alert(t('settings.alert_profile_failed'))
     } finally {
       setIsProfileLoading(false)
     }
@@ -98,7 +107,7 @@ export default function SettingsPage() {
   const handlePasswordSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (passwordData.new_password !== passwordData.confirm_password) {
-      alert("Passwords do not match!")
+      alert(t('settings.alert_password_mismatch'))
       return
     }
     setIsPasswordLoading(true)
@@ -116,14 +125,14 @@ export default function SettingsPage() {
       })
       const data = await response.json()
       if (data.success) {
-        alert("Password updated successfully!")
+        alert(t('settings.alert_password_success'))
         setPasswordData({ old_password: "", new_password: "", confirm_password: "" })
       } else {
-        alert("Error: " + JSON.stringify(data.errors || data.error))
+        alert(t('settings.alert_profile_error', { errors: JSON.stringify(data.errors || data.error) }))
       }
     } catch (error) {
       console.error("Password change failed", error)
-      alert("Failed to change password.")
+      alert(t('settings.alert_password_failed'))
     } finally {
       setIsPasswordLoading(false)
     }
@@ -149,11 +158,11 @@ export default function SettingsPage() {
             className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Chat
+            {t('settings.back_to_chat')}
           </Link>
-          <h1 className="text-2xl font-bold">My Profile</h1>
+          <h1 className="text-2xl font-bold">{t('settings.title')}</h1>
           <p className="mt-1 text-muted-foreground">
-            Update your personal information, language preference, and password
+            {t('settings.subtitle')}
           </p>
         </div>
 
@@ -166,9 +175,9 @@ export default function SettingsPage() {
                   <User className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <CardTitle>General Settings</CardTitle>
+                  <CardTitle>{t('settings.general_settings')}</CardTitle>
                   <CardDescription>
-                    Manage your profile information
+                    {t('settings.manage_profile')}
                   </CardDescription>
                 </div>
               </div>
@@ -177,19 +186,19 @@ export default function SettingsPage() {
               <form onSubmit={handleProfileSave} className="space-y-6">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="first_name">First Name</Label>
+                    <Label htmlFor="first_name">{t('settings.first_name')}</Label>
                     <Input
                       id="first_name"
-                      placeholder="Enter your first name"
+                      placeholder={t('settings.first_name_placeholder')}
                       value={settingsData.first_name}
                       onChange={(e) => setSettingsData({ ...settingsData, first_name: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="last_name">Last Name</Label>
+                    <Label htmlFor="last_name">{t('settings.last_name')}</Label>
                     <Input
                       id="last_name"
-                      placeholder="Enter your last name"
+                      placeholder={t('settings.last_name_placeholder')}
                       value={settingsData.last_name}
                       onChange={(e) => setSettingsData({ ...settingsData, last_name: e.target.value })}
                     />
@@ -199,7 +208,7 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                   <Label htmlFor="defaultLanguage" className="flex items-center gap-2">
                     <Globe className="h-4 w-4 text-muted-foreground" />
-                    Default Language
+                    {t('settings.default_language')}
                   </Label>
                   <Select 
                     value={settingsData.preferred_language}
@@ -218,7 +227,7 @@ export default function SettingsPage() {
                     }}
                   >
                     <SelectTrigger id="defaultLanguage">
-                      <SelectValue placeholder="Select language" />
+                      <SelectValue placeholder={t('settings.default_language')} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="en">English</SelectItem>
@@ -229,7 +238,7 @@ export default function SettingsPage() {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    This updates your default global language UI
+                    {t('settings.language_update_hint')}
                   </p>
                 </div>
 
@@ -239,7 +248,7 @@ export default function SettingsPage() {
                   ) : (
                     <>
                       <Save className="h-4 w-4" />
-                      Save Profile Info
+                      {t('settings.save_profile')}
                     </>
                   )}
                 </Button>
@@ -255,9 +264,9 @@ export default function SettingsPage() {
                   <Lock className="h-5 w-5 text-destructive" />
                 </div>
                 <div>
-                  <CardTitle>Change Password</CardTitle>
+                  <CardTitle>{t('settings.change_password')}</CardTitle>
                   <CardDescription>
-                    Update your account password
+                    {t('settings.update_password_desc')}
                   </CardDescription>
                 </div>
               </div>
@@ -265,12 +274,12 @@ export default function SettingsPage() {
             <CardContent>
               <form onSubmit={handlePasswordSave} className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="oldPassword">Old Password</Label>
+                  <Label htmlFor="oldPassword">{t('settings.old_password')}</Label>
                   <div className="relative">
                     <Input
                       id="oldPassword"
                       type={showOldPassword ? "text" : "password"}
-                      placeholder="Enter your current password"
+                      placeholder={t('settings.old_password_placeholder')}
                       className="pr-11"
                       value={passwordData.old_password}
                       onChange={(e) => setPasswordData({ ...passwordData, old_password: e.target.value })}
@@ -292,12 +301,12 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="newPassword">New Password</Label>
+                  <Label htmlFor="newPassword">{t('settings.new_password')}</Label>
                   <div className="relative">
                     <Input
                       id="newPassword"
                       type={showNewPassword ? "text" : "password"}
-                      placeholder="Enter your new password"
+                      placeholder={t('settings.new_password_placeholder')}
                       className="pr-11"
                       value={passwordData.new_password}
                       onChange={(e) => setPasswordData({ ...passwordData, new_password: e.target.value })}
@@ -319,12 +328,12 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                  <Label htmlFor="confirmPassword">{t('settings.confirm_password')}</Label>
                   <div className="relative">
                     <Input
                       id="confirmPassword"
                       type={showConfirmPassword ? "text" : "password"}
-                      placeholder="Confirm your new password"
+                      placeholder={t('settings.confirm_password_placeholder')}
                       className="pr-11"
                       value={passwordData.confirm_password}
                       onChange={(e) => setPasswordData({ ...passwordData, confirm_password: e.target.value })}
@@ -351,7 +360,7 @@ export default function SettingsPage() {
                   ) : (
                     <>
                       <Shield className="h-4 w-4" />
-                      Update Password
+                      {t('settings.update_password_button')}
                     </>
                   )}
                 </Button>
@@ -362,21 +371,21 @@ export default function SettingsPage() {
           {/* Danger Zone */}
           <Card className="border-destructive/30">
             <CardHeader>
-              <CardTitle className="text-destructive">Danger Zone</CardTitle>
+              <CardTitle className="text-destructive">{t('settings.danger_zone')}</CardTitle>
               <CardDescription>
-                Irreversible and destructive actions
+                {t('settings.destructive_actions')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="font-medium">Delete Account</p>
+                  <p className="font-medium">{t('settings.delete_account')}</p>
                   <p className="text-sm text-muted-foreground">
-                    Permanently delete your account and all data
+                    {t('settings.delete_account_desc')}
                   </p>
                 </div>
                 <Button variant="outline" className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground">
-                  Delete Account
+                  {t('settings.delete_account')}
                 </Button>
               </div>
             </CardContent>

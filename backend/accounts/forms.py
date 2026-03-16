@@ -38,7 +38,6 @@ class FarmerProfileForm(forms.ModelForm):
         widgets = {
             'current_crops': forms.TextInput(attrs={'placeholder': 'e.g. maize, tomatoes, groundnuts'}),
             'past_crops': forms.TextInput(attrs={'placeholder': 'e.g. cassava, yam'}),
-            'has_livestock': forms.Select(choices=[(True, 'Yes'), (False, 'No')]),
             'livestock_types': forms.TextInput(attrs={'placeholder': 'e.g. goats, chickens'}),
         }
 

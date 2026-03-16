@@ -35,6 +35,7 @@ import {
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
+import { useTranslation } from "@/app/i18n/LanguageContext"
 
 interface Message {
   id: string | number
@@ -49,13 +50,6 @@ interface ConversationItem {
   title: string
   updated_at: string
 }
-
-const quickActions = [
-  { icon: Leaf, label: "Crop disease diagnosis" },
-  { icon: Droplets, label: "Irrigation advice" },
-  { icon: Sun, label: "Weather impact on farming" },
-  { icon: BookOpen, label: "Farming best practices" },
-]
 
 function FormattedMessage({ content }: { content: string }) {
   // Split by [FARMBUDDY_REFS] to only show main content
@@ -77,6 +71,7 @@ function FormattedMessage({ content }: { content: string }) {
 }
 
 export default function ChatPage() {
+  const { t } = useTranslation()
   const [messages, setMessages] = useState<Message[]>([])
   const [conversations, setConversations] = useState<ConversationItem[]>([])
   const [currentConvId, setCurrentConvId] = useState<number | null>(null)
@@ -95,9 +90,18 @@ export default function ChatPage() {
   const [editingConvId, setEditingConvId] = useState<number | null>(null)
   const [editingTitle, setEditingTitle] = useState("")
   const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recognitionRef = useRef<any>(null)
+  const audioChunksRef = useRef<Blob[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  const quickActions = [
+    { icon: Leaf, label: t("chat.quick_actions.crop_disease") },
+    { icon: Droplets, label: t("chat.quick_actions.irrigation") },
+    { icon: Sun, label: t("chat.quick_actions.weather") },
+    { icon: BookOpen, label: t("chat.quick_actions.best_practices") },
+  ]
 
   const scrollToBottom = useCallback(() => {
     if (scrollAreaRef.current) {
@@ -144,69 +148,111 @@ export default function ChatPage() {
   const [weatherData, setWeatherData] = useState<any>(null)
   const [isRecording, setIsRecording] = useState(false)
 
-  const handleMicClick = () => {
+  const handleMicClick = async () => {
     if (isRecording) {
-      recognitionRef.current?.stop()
-      setIsRecording(false)
+      // Stop MediaRecorder
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      // Stop SpeechRecognition
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsRecording(false);
     } else {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-      if (!SpeechRecognition) {
-        alert("Speech recognition is not supported in this browser.")
-        return
-      }
+      try {
+        // 1. Setup MediaRecorder for robust backend transcription
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
 
-      const recognition = new SpeechRecognition()
-      recognitionRef.current = recognition
-
-      // Map preferred language to BCP-47 tags
-      const langMap: Record<string, string> = {
-        'en': 'en-US',
-        'ha': 'ha-NG',
-        'ig': 'ig-NG',
-        'yo': 'yo-NG',
-      }
-
-      recognition.lang = langMap[preferredLanguage] || 'en-US'
-      recognition.continuous = true
-      recognition.interimResults = true
-
-      recognition.onstart = () => {
-        setIsRecording(true)
-      }
-
-      recognition.onresult = (event: any) => {
-        let interimTranscript = ''
-        let finalTranscript = ''
-
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript
-          } else {
-            interimTranscript += event.results[i][0].transcript
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
           }
+        };
+
+        mediaRecorder.onstop = async () => {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const formData = new FormData();
+          formData.append('audio', audioBlob, 'recording.webm');
+          formData.append('language', preferredLanguage);
+
+          setIsLoading(true);
+          try {
+            const res = await fetch(`${API_BASE}/api/transcribe/`, {
+              method: 'POST',
+              body: formData,
+              credentials: 'include'
+            });
+            const data = await res.json();
+            if (data.success && data.text) {
+              // Finalize with high-quality backend transcription
+              setInputValue(data.text);
+            } else if (data.error) {
+              console.error("Transcription error:", data.error);
+            }
+          } catch (err) {
+            console.error("Failed to transcribe audio:", err);
+          } finally {
+            setIsLoading(false);
+            stream.getTracks().forEach(track => track.stop());
+          }
+        };
+
+        // 2. Setup SpeechRecognition for real-time visual feedback
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (SpeechRecognition) {
+          const recognition = new SpeechRecognition();
+          recognitionRef.current = recognition;
+
+          const langMap: Record<string, string> = {
+            'en': 'en-US',
+            'ha': 'ha-NG',
+            'ig': 'ig-NG',
+            'yo': 'yo-NG',
+          };
+
+          recognition.lang = langMap[preferredLanguage] || 'en-US';
+          recognition.continuous = true;
+          recognition.interimResults = true;
+
+          recognition.onresult = (event: any) => {
+            let interimTranscript = '';
+            let finalTranscript = '';
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+              if (event.results[i].isFinal) {
+                finalTranscript += event.results[i][0].transcript;
+              } else {
+                interimTranscript += event.results[i][0].transcript;
+              }
+            }
+
+            if (finalTranscript || interimTranscript) {
+              setInputValue(finalTranscript + interimTranscript);
+            }
+          };
+
+          recognition.onerror = (event: any) => {
+            // Silently handle network errors, as MediaRecorder is the reliable source
+            if (event.error !== 'network') {
+              console.warn("Speech recognition feedback error:", event.error);
+            }
+          };
+
+          recognition.start();
         }
 
-        if (finalTranscript || interimTranscript) {
-          setInputValue(prev => {
-            // Simply append or replace? GitHub logic replaces if it's a fresh start
-            // but we'll append to existing text just in case user typed something
-            return finalTranscript + interimTranscript
-          })
-        }
+        mediaRecorder.start();
+        setIsRecording(true);
+      } catch (err) {
+        console.error("Failed to start recording:", err);
+        alert("Failed to start recording. Please check microphone permissions.");
       }
-
-      recognition.onerror = (event: any) => {
-        console.error("Speech recognition error", event.error)
-        setIsRecording(false)
-      }
-
-      recognition.onend = () => {
-        setIsRecording(false)
-      }
-
-      recognition.start()
     }
-  }
+  };
 
   const playMessage = async (message: Message) => {
     // If currently speaking this message
@@ -234,7 +280,7 @@ export default function ChatPage() {
 
     try {
       // Use direct URL for streaming instead of fetching blob
-      const url = `${API_BASE}/api/speak/?text=${encodeURIComponent(message.content)}&language=en`
+      const url = `${API_BASE}/api/speak/?text=${encodeURIComponent(message.content)}&language=${preferredLanguage}`
       const audio = new Audio(url)
       audioRef.current = audio
       audio.onended = () => {
@@ -251,7 +297,7 @@ export default function ChatPage() {
 
   const handleWeatherClick = () => {
     if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser")
+      alert(t("chat.error_location_support"))
       return
     }
 
@@ -271,7 +317,10 @@ export default function ChatPage() {
           setMessages(prev => [...prev, {
             id: Date.now(),
             role: "assistant",
-            content: `I've updated your farm's weather context. Currently: ${data.data.current.weather[0].description}, ${Math.round(data.data.current.main.temp)}°C. How can I help you today based on this?`
+            content: t("chat.weather_update", {
+              description: data.data.current.weather[0].description,
+              temp: Math.round(data.data.current.main.temp)
+            })
           }])
         }
       } catch (err) {
@@ -282,7 +331,7 @@ export default function ChatPage() {
     }, (err) => {
       console.error("Geolocation error", err)
       setIsLoading(false)
-      alert("Could not get your location. Please check permissions.")
+      alert(t("chat.error_location_perm"))
     })
   }
 
@@ -417,7 +466,7 @@ export default function ChatPage() {
       setMessages(prev => [...prev, {
         id: Date.now() + 2,
         role: "assistant",
-        content: "Sorry, I encountered an error connecting to the server."
+        content: t("chat.error_server")
       }])
     } finally {
       setIsLoading(false)
@@ -441,7 +490,7 @@ export default function ChatPage() {
 
   const handleDeleteConversation = async (e: React.MouseEvent, id: number) => {
     e.stopPropagation()
-    if (!confirm("Are you sure you want to delete this chat?")) return
+    if (!confirm(t("chat.delete_confirm"))) return
 
     try {
       const res = await fetch(`${API_BASE}/api/delete/${id}/`, {
@@ -543,13 +592,13 @@ export default function ChatPage() {
           onClick={handleNewChat}
         >
           <Plus className="h-4 w-4" />
-          New Chat
+          {t("chat.new_chat")}
         </Button>
       </div>
 
       <ScrollArea className="flex-1 px-4">
         <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
-          Recent
+          {t("chat.recent")}
         </p>
         <div className="space-y-1">
           {conversations.length > 0 ? (
@@ -588,15 +637,17 @@ export default function ChatPage() {
                     </Button>
                   </form>
                 ) : (
-                  <button
-                    onClick={() => loadConversation(conv.id)}
-                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors ${currentConvId === conv.id
-                        ? "bg-sidebar-accent text-sidebar-foreground pr-16"
-                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground pr-16"
-                      }`}
-                  >
-                    <MessageSquare className="h-4 w-4 shrink-0 opacity-70" />
-                    <span className="truncate text-left">{conv.title}</span>
+                  <div className="flex w-full items-center relative">
+                    <button
+                      onClick={() => loadConversation(conv.id)}
+                      className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors ${currentConvId === conv.id
+                          ? "bg-sidebar-accent text-sidebar-foreground pr-16"
+                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground pr-16"
+                        }`}
+                    >
+                      <MessageSquare className="h-4 w-4 shrink-0 opacity-70" />
+                      <span className="truncate text-left">{conv.title}</span>
+                    </button>
                     
                     <div className={cn(
                       "absolute right-2 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100",
@@ -619,13 +670,13 @@ export default function ChatPage() {
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
-                  </button>
+                  </div>
                 )}
               </div>
             ))
           ) : (
             <p className="py-8 text-center text-sm text-sidebar-foreground/40">
-              No conversations yet
+              {t("chat.no_conversations")}
             </p>
           )}
         </div>
@@ -638,14 +689,14 @@ export default function ChatPage() {
             className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
           >
             <User className="h-4 w-4 opacity-70" />
-            My Farm
+            {t("chat.my_farm")}
           </Link>
           <Link
             href="/settings"
             className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
           >
             <Settings className="h-4 w-4 opacity-70" />
-            Settings
+            {t("chat.settings")}
           </Link>
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -656,14 +707,14 @@ export default function ChatPage() {
             ) : (
               <Moon className="h-4 w-4 opacity-70" />
             )}
-            {theme === "dark" ? "Light Mode" : "Dark Mode"}
+            {theme === "dark" ? t("chat.light_mode") : t("chat.dark_mode")}
           </button>
           <button
             onClick={handleLogout}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-red-400 transition-colors hover:bg-sidebar-accent"
           >
             <LogOut className="h-4 w-4 opacity-70" />
-            Logout
+            {t("chat.logout")}
           </button>
         </div>
       </div>
@@ -671,7 +722,7 @@ export default function ChatPage() {
   )
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-[100dvh] bg-background overflow-hidden">
       {/* Desktop Sidebar */}
       <aside className="hidden w-64 shrink-0 bg-sidebar lg:block">
         <SidebarContent />
@@ -689,7 +740,7 @@ export default function ChatPage() {
       </Sheet>
 
       {/* Main Content */}
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col min-h-0">
         {/* Header */}
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card px-4">
           <div className="flex items-center gap-3">
@@ -702,8 +753,8 @@ export default function ChatPage() {
               <Menu className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-sm font-medium">Agricultural Advisor</h1>
-              <p className="text-xs text-muted-foreground">Voice-Enabled AI</p>
+              <h1 className="text-sm font-medium">{t("chat.header_title")}</h1>
+              <p className="text-xs text-muted-foreground">{t("chat.header_subtitle")}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -719,15 +770,14 @@ export default function ChatPage() {
             <Link href="/profile">
               <Button variant="outline" size="sm" className="gap-2">
                 <User className="h-4 w-4" />
-                <span className="hidden sm:inline">My Farm</span>
+                <span className="hidden sm:inline">{t("chat.my_farm")}</span>
               </Button>
             </Link>
           </div>
         </header>
 
-        {/* Chat Area */}
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <ScrollArea className="flex-1 h-full" ref={scrollAreaRef}>
+        <div className="flex flex-1 flex-col overflow-hidden min-h-0">
+          <ScrollArea className="flex-1" ref={scrollAreaRef}>
             <div className="mx-auto max-w-3xl px-4 pt-20 pb-8">
               {messages.length === 0 ? (
                 <div className="flex flex-col items-center py-8">
@@ -736,9 +786,9 @@ export default function ChatPage() {
                       <Sprout className="h-8 w-8 text-primary-foreground" />
                     </div>
                   </div>
-                  <h2 className="mb-2 text-2xl font-bold">Welcome to FarmBuddy!</h2>
+                  <h2 className="mb-2 text-2xl font-bold">{t("chat.welcome_title")}</h2>
                   <p className="mb-8 max-w-md text-center text-muted-foreground">
-                    {"I'm your AI agricultural advisor for Nigerian smallholder farmers. Ask me anything about:"}
+                    {t("chat.welcome_subtitle")}
                   </p>
 
                   <div className="grid w-full max-w-lg grid-cols-1 gap-3 sm:grid-cols-2">
@@ -803,18 +853,18 @@ export default function ChatPage() {
                                   isPaused ? (
                                     <>
                                       <Play className="h-3.5 w-3.5" />
-                                      Resume
+                                      {t('chat.resume')}
                                     </>
                                   ) : (
                                     <>
                                       <Pause className="h-3.5 w-3.5 animate-pulse" />
-                                      Pause
+                                      {t('chat.pause')}
                                     </>
                                   )
                                 ) : (
                                   <>
                                     <Mic className="h-3.5 w-3.5" />
-                                    Listen
+                                    {t('chat.listen')}
                                   </>
                                 )}
                               </Button>
@@ -824,7 +874,7 @@ export default function ChatPage() {
                                 size="sm"
                                 className="h-9 w-9 p-0"
                                 onClick={() => copyToClipboard(message.content, message.id)}
-                                title="Copy response"
+                                title={t('chat.copy_response')}
                               >
                                 {copiedId === message.id ? (
                                   <Check className="h-4 w-4 text-green-500" />
@@ -834,7 +884,7 @@ export default function ChatPage() {
                               </Button>
                             </div>
                             <span className="text-[10px] text-muted-foreground italic">
-                              Response generated by FarmBuddy
+                              {t('chat.response_generated_by')}
                             </span>
                           </div>
                         )}
@@ -843,7 +893,7 @@ export default function ChatPage() {
                           <div className="mt-4 rounded-2xl bg-primary/5 p-4 border border-primary/10 shadow-inner">
                             <div className="flex items-center gap-2 mb-3">
                               <Sprout className="h-4 w-4 text-primary" />
-                              <p className="text-[11px] font-bold uppercase tracking-widest text-primary">Sources & Context</p>
+                              <p className="text-[11px] font-bold uppercase tracking-widest text-primary">{t('chat.sources_header')}</p>
                             </div>
                             <ul className="space-y-3">
                               {message.references.map((ref: any, idx: number) => (
@@ -851,7 +901,7 @@ export default function ChatPage() {
                                   <div className="shrink-0 mt-1 h-1.5 w-1.5 rounded-full bg-primary/40 group-hover:bg-primary/60 transition-colors" />
                                   <span>
                                     <strong className="text-foreground/80 font-bold uppercase text-[10px] block mb-0.5 tracking-tight">
-                                      {ref.type === 'profile' ? 'From Your Farm Profile' : 'Continuing Conversation'} ({ref.key}):
+                                      {ref.type === 'profile' ? t('chat.source_profile') : t('chat.source_conversation')} ({ref.key}):
                                     </strong>{" "}
                                     {ref.explanation}
                                   </span>
@@ -986,7 +1036,7 @@ export default function ChatPage() {
                         handleSend()
                       }
                     }}
-                    placeholder="Type, speak, or upload an image..."
+                    placeholder={t('chat.input_placeholder_alt')}
                     className="h-12 w-full rounded-xl border-border bg-background pr-4 pl-4 text-foreground placeholder:text-muted-foreground"
                   />
                 </div>

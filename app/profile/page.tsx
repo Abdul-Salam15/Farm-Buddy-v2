@@ -35,6 +35,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart"
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, CartesianGrid } from "recharts"
+import { useTranslation } from "@/app/i18n/LanguageContext"
 
 // Static fallbacks removed - now managed in component state
 
@@ -50,6 +51,7 @@ const chartConfig = {
 }
 
 export default function ProfilePage() {
+  const { t, setLanguage } = useTranslation()
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [profileData, setProfileData] = useState({
@@ -139,6 +141,9 @@ export default function ProfilePage() {
             soil_type: profile.soil_type || "unknown",
             ph_level: profile.ph_level || "unknown",
           })
+          if (profile.preferred_language) {
+            setLanguage(profile.preferred_language)
+          }
           if (profile.location) {
             fetchWeather(profile.location)
           }
@@ -152,7 +157,7 @@ export default function ProfilePage() {
       }
     }
     fetchProfile()
-  }, [router])
+  }, [router, setLanguage])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target
@@ -163,7 +168,8 @@ export default function ProfilePage() {
     setProfileData(prev => ({ ...prev, [id]: value }))
     
     // Immediate sync for language
-    if (id === 'preferred_language') {
+    if (id === 'preferred_language' && typeof value === 'string') {
+      setLanguage(value)
       try {
         await fetch("http://localhost:8000/accounts/update-language/", {
           method: "POST",
@@ -192,14 +198,14 @@ export default function ProfilePage() {
       })
       const data = await response.json()
       if (data.success) {
-        alert("Farm profile updated successfully!")
+        alert(t('profile.alert_success'))
         fetchWeather(profileData.location)
       } else {
-        alert("Error updating profile: " + JSON.stringify(data.errors))
+        alert(t('profile.alert_error', { errors: JSON.stringify(data.errors) }))
       }
     } catch (error) {
       console.error("Save failed", error)
-      alert("Failed to save farm data. Please try again.")
+      alert(t('profile.alert_save_failed'))
     } finally {
       setIsSaving(false)
     }
@@ -225,7 +231,7 @@ export default function ProfilePage() {
     if (token) {
       window.open(`https://t.me/${botUsername}?start=${token}`, '_blank')
     } else {
-      alert("No linking token available. Are you already linked?")
+      alert(t('profile.alert_no_token'))
     }
   }
 
@@ -249,11 +255,11 @@ export default function ProfilePage() {
             className="mb-4 inline-flex items-center gap-2 text-sm text-red-400 transition-colors hover:text-red-500"
           >
             <LogOut className="h-4 w-4" />
-            Logout
+            {t('common.logout')}
           </button>
-          <h1 className="text-2xl font-bold">My Farm</h1>
+          <h1 className="text-2xl font-bold">{t('profile.title')}</h1>
           <p className="mt-1 text-muted-foreground">
-            Manage your farm data and preferences for personalized AI recommendations
+            {t('profile.subtitle')}
           </p>
         </div>
 
@@ -265,9 +271,9 @@ export default function ProfilePage() {
                 <Lightbulb className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               </div>
               <div>
-                <h3 className="font-semibold text-amber-900 dark:text-amber-100">{profileData.preferred_language === 'ha' ? 'Shawarar Rana' : profileData.preferred_language === 'ig' ? 'Ndụmọdụ Kwa Ụbọchị' : profileData.preferred_language === 'yo' ? 'Imọran Ojoojumọ' : 'Daily Tip'}</h3>
+                <h3 className="font-semibold text-amber-900 dark:text-amber-100">{t('profile.daily_tip')}</h3>
                 <p className="mt-1 text-sm text-amber-800/80 dark:text-amber-200/70">
-                  {profileData.daily_tip || "Water your crops early in the morning to reduce evaporation and improve absorption."}
+                  {profileData.daily_tip || t('profile.daily_tip_placeholder')}
                 </p>
               </div>
             </CardContent>
@@ -279,13 +285,13 @@ export default function ProfilePage() {
                 <MessageCircle className="h-5 w-5 text-sky-600 dark:text-sky-400" />
               </div>
               <div>
-                <h3 className="font-semibold text-sky-900 dark:text-sky-100">Stay Connected</h3>
+                <h3 className="font-semibold text-sky-900 dark:text-sky-100">{t('profile.stay_connected')}</h3>
                 <p className="mt-1 text-sm text-sky-800/80 dark:text-sky-200/70">
-                  Get farming advice on Telegram
+                  {t('profile.telegram_advice')}
                 </p>
-                <Button size="sm" className="mt-3 gap-2 bg-sky-600 hover:bg-sky-700">
+                <Button size="sm" className="mt-3 gap-2 bg-sky-600 hover:bg-sky-700" onClick={handleOpenTelegram}>
                   <ExternalLink className="h-3.5 w-3.5" />
-                  Open Telegram Bot
+                  {t('profile.open_telegram')}
                 </Button>
               </div>
             </CardContent>
@@ -302,9 +308,9 @@ export default function ProfilePage() {
                     <Sprout className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <CardTitle>Edit Farm Data</CardTitle>
+                    <CardTitle>{t('profile.edit_farm_data')}</CardTitle>
                     <CardDescription>
-                      Update your farm information for better recommendations
+                      {t('profile.update_info')}
                     </CardDescription>
                   </div>
                 </div>
@@ -314,30 +320,29 @@ export default function ProfilePage() {
                   {/* Basic Info */}
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="preferred_language">Preferred Language</Label>
+                      <Label htmlFor="preferred_language">{t('profile.lang_pref')}</Label>
                       <Select 
                         value={profileData.preferred_language} 
                         onValueChange={(val) => handleSelectChange('preferred_language', val)}
                       >
                         <SelectTrigger id="preferred_language">
-                          <SelectValue placeholder="Select language" />
+                          <SelectValue placeholder={t('profile.lang_pref')} />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="en">English</SelectItem>
-                          <SelectItem value="yo">Yoruba</SelectItem>
-                          <SelectItem value="ig">Igbo</SelectItem>
                           <SelectItem value="ha">Hausa</SelectItem>
-
+                          <SelectItem value="ig">Igbo</SelectItem>
+                          <SelectItem value="yo">Yoruba</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="first_name">First Name</Label>
+                      <Label htmlFor="first_name">{t('profile.first_name')}</Label>
                       <Input id="first_name" value={profileData.first_name} onChange={handleInputChange} />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="last_name">Last Name</Label>
+                      <Label htmlFor="last_name">{t('profile.last_name')}</Label>
                       <Input id="last_name" value={profileData.last_name} onChange={handleInputChange} />
                     </div>
                   </div>
@@ -345,26 +350,26 @@ export default function ProfilePage() {
                   {/* Location */}
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="location">Farm Location</Label>
+                      <Label htmlFor="location">{t('profile.farm_location')}</Label>
                       <Input
                         id="location"
                         value={profileData.location}
                         onChange={handleInputChange}
-                        placeholder="Town, state or region"
+                        placeholder={t('profile.town_state')}
                       />
                       <p className="text-xs text-muted-foreground">
-                        Town, state or region
+                        {t('profile.town_state')}
                       </p>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="farm_size_acres">Farm Size (acres)</Label>
+                      <Label htmlFor="farm_size_acres">{t('profile.farm_size')}</Label>
                       <Input
                         id="farm_size_acres"
                         type="number"
                         value={profileData.farm_size_acres}
                         onChange={handleInputChange}
-                        placeholder="Leave blank if unsure"
+                        placeholder={t('profile.leave_blank')}
                       />
                     </div>
                   </div>
@@ -372,38 +377,38 @@ export default function ProfilePage() {
                   {/* Soil */}
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="soil_type">Soil Appearance</Label>
+                      <Label htmlFor="soil_type">{t('profile.soil_appearance')}</Label>
                       <Select 
                         value={profileData.soil_type} 
                         onValueChange={(val) => handleSelectChange('soil_type', val)}
                       >
                         <SelectTrigger id="soil_type">
-                          <SelectValue placeholder="Select soil type" />
+                          <SelectValue placeholder={t('profile.soil_appearance')} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="unknown">I am not sure</SelectItem>
-                          <SelectItem value="sandy">Sandy</SelectItem>
-                          <SelectItem value="clay">Clay</SelectItem>
-                          <SelectItem value="loamy">Loamy</SelectItem>
-                          <SelectItem value="silt">Silty</SelectItem>
+                          <SelectItem value="unknown">{t('profile.soil_types.unknown')}</SelectItem>
+                          <SelectItem value="sandy">{t('profile.soil_types.sandy')}</SelectItem>
+                          <SelectItem value="clay">{t('profile.soil_types.clay')}</SelectItem>
+                          <SelectItem value="loamy">{t('profile.soil_types.loamy')}</SelectItem>
+                          <SelectItem value="silt">{t('profile.soil_types.silt')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="ph_level">Soil Acidity (pH)</Label>
+                      <Label htmlFor="ph_level">{t('profile.soil_acidity')}</Label>
                       <Select 
                         value={profileData.ph_level} 
                         onValueChange={(val) => handleSelectChange('ph_level', val)}
                       >
                         <SelectTrigger id="ph_level">
-                          <SelectValue placeholder="Select description" />
+                          <SelectValue placeholder={t('profile.soil_acidity')} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="unknown">I am not sure</SelectItem>
-                          <SelectItem value="acidic">Acidic (tastes sour, kills grass)</SelectItem>
-                          <SelectItem value="neutral">Neutral (normal soil)</SelectItem>
-                          <SelectItem value="alkaline">Alkaline (white crust on soil surface)</SelectItem>
+                          <SelectItem value="unknown">{t('profile.ph_levels.unknown')}</SelectItem>
+                          <SelectItem value="acidic">{t('profile.ph_levels.acidic')}</SelectItem>
+                          <SelectItem value="neutral">{t('profile.ph_levels.neutral')}</SelectItem>
+                          <SelectItem value="alkaline">{t('profile.ph_levels.alkaline')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -412,24 +417,24 @@ export default function ProfilePage() {
                   {/* Irrigation & Crops */}
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="water_source">Irrigation Method</Label>
+                      <Label htmlFor="water_source">{t('profile.irrigation_method')}</Label>
                       <Select 
                         value={profileData.water_source} 
                         onValueChange={(val) => handleSelectChange('water_source', val)}
                       >
                         <SelectTrigger id="water_source">
-                          <SelectValue placeholder="Select method" />
+                          <SelectValue placeholder={t('profile.irrigation_method')} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="rainfed">Rainfed only</SelectItem>
-                          <SelectItem value="irrigated">I have irrigation</SelectItem>
-                          <SelectItem value="seasonal">Seasonal stream / borehole</SelectItem>
+                          <SelectItem value="rainfed">{t('profile.water_sources.rainfed')}</SelectItem>
+                          <SelectItem value="irrigated">{t('profile.water_sources.irrigated')}</SelectItem>
+                          <SelectItem value="seasonal">{t('profile.water_sources.seasonal')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="current_crops">Current Crops</Label>
+                      <Label htmlFor="current_crops">{t('profile.current_crops')}</Label>
                       <Input
                         id="current_crops"
                         value={profileData.current_crops}
@@ -437,7 +442,7 @@ export default function ProfilePage() {
                         placeholder="e.g. maize, tomatoes, groundnuts"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Comma separated
+                        {t('profile.comma_separated')}
                       </p>
                     </div>
                   </div>
@@ -445,7 +450,7 @@ export default function ProfilePage() {
                   {/* History */}
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="past_crops">Previous Crops</Label>
+                      <Label htmlFor="past_crops">{t('profile.previous_crops')}</Label>
                       <Input
                         id="past_crops"
                         value={profileData.past_crops}
@@ -455,7 +460,7 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="top_pests">Common Pests</Label>
+                      <Label htmlFor="top_pests">{t('profile.common_pests')}</Label>
                       <Textarea
                         id="top_pests"
                         value={profileData.top_pests}
@@ -470,23 +475,23 @@ export default function ProfilePage() {
                   {/* Animals */}
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="has_livestock">Do you keep animals?</Label>
+                      <Label htmlFor="has_livestock">{t('profile.keep_animals')}</Label>
                       <Select 
                         value={profileData.has_livestock ? "yes" : "no"} 
                         onValueChange={(val) => handleSelectChange('has_livestock', val === "yes")}
                       >
                         <SelectTrigger id="has_livestock">
-                          <SelectValue placeholder="Select" />
+                          <SelectValue placeholder={t('profile.keep_animals')} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="no">No</SelectItem>
-                          <SelectItem value="yes">Yes</SelectItem>
+                          <SelectItem value="no">{t('profile.no')}</SelectItem>
+                          <SelectItem value="yes">{t('profile.yes')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     {profileData.has_livestock && (
                       <div className="space-y-2">
-                        <Label htmlFor="livestock_types">What animals?</Label>
+                        <Label htmlFor="livestock_types">{t('profile.what_animals')}</Label>
                         <Input
                           id="livestock_types"
                           value={profileData.livestock_types}
@@ -528,7 +533,7 @@ export default function ProfilePage() {
                     ) : (
                       <>
                         <Save className="h-4 w-4" />
-                        Save Farm Data
+                        {t('profile.save_farm_data')}
                       </>
                     )}
                   </Button>
@@ -544,18 +549,18 @@ export default function ProfilePage() {
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-2">
                   <Cloud className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-base">Weekly Forecast</CardTitle>
+                  <CardTitle className="text-base">{t('profile.weekly_forecast')}</CardTitle>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="mb-4 flex items-center justify-center gap-6">
                   <div className="flex items-center gap-2">
                     <div className="h-2.5 w-2.5 rounded-full bg-chart-4" />
-                    <span className="text-xs text-muted-foreground">Temp (°C)</span>
+                    <span className="text-xs text-muted-foreground">{t('profile.avg_temp')} (°C)</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="h-2.5 w-2.5 rounded-full bg-chart-2" />
-                    <span className="text-xs text-muted-foreground">Humidity (%)</span>
+                    <span className="text-xs text-muted-foreground">{t('profile.humidity')} (%)</span>
                   </div>
                 </div>
 
@@ -632,7 +637,7 @@ export default function ProfilePage() {
                         ? `${Math.round(weatherData.reduce((acc, curr) => acc + curr.temperature, 0) / weatherData.length)}°C` 
                         : "--"}
                     </p>
-                    <p className="text-xs text-muted-foreground">Avg Temp</p>
+                    <p className="text-xs text-muted-foreground">{t('profile.avg_temp')}</p>
                   </div>
                   <div className="rounded-xl bg-muted/50 p-3 text-center">
                     <Droplets className="mx-auto h-4 w-4 text-blue-500" />
@@ -641,14 +646,14 @@ export default function ProfilePage() {
                         ? `${Math.round(weatherData.reduce((acc, curr) => acc + curr.humidity, 0) / weatherData.length)}%` 
                         : "--"}
                     </p>
-                    <p className="text-xs text-muted-foreground">Humidity</p>
+                    <p className="text-xs text-muted-foreground">{t('profile.humidity')}</p>
                   </div>
                   <div className="rounded-xl bg-muted/50 p-3 text-center">
                     <TrendingUp className="mx-auto h-4 w-4 text-primary" />
                     <p className="mt-1.5 text-lg font-semibold">
-                      {weatherData.length > 0 ? "Good" : "--"}
+                      {weatherData.length > 0 ? t('profile.outlook_good') : "--"}
                     </p>
-                    <p className="text-xs text-muted-foreground">Outlook</p>
+                    <p className="text-xs text-muted-foreground">{t('profile.outlook')}</p>
                   </div>
                 </div>
               </CardContent>
@@ -659,18 +664,18 @@ export default function ProfilePage() {
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-2">
                   <MessageCircle className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-base">Recent Chat History</CardTitle>
+                  <CardTitle className="text-base">{t('profile.recent_chat')}</CardTitle>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="rounded-xl bg-muted/30 py-8 text-center">
                   <MessageCircle className="mx-auto h-8 w-8 text-muted-foreground/50" />
                   <p className="mt-3 text-sm text-muted-foreground">
-                    No recent messages.
+                    {t('profile.no_recent')}
                   </p>
                   <Link href="/chat">
                     <Button variant="link" size="sm" className="mt-1">
-                      Start chatting
+                      {t('profile.start_chatting')}
                     </Button>
                   </Link>
                 </div>

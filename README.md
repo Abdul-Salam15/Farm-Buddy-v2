@@ -147,6 +147,25 @@ TELEGRAM_BOT_TOKEN=your_bot_token
 
 ---
 
+## Recent Improvements 🚀
+
+- **Robust Internationalization**: Enforced English as the global default with hydration-safe context management.
+- **Enhanced Signup Flow**: Improved multi-step signup with structured error handling, name synchronization, and optional farm detail sanitization.
+- **Voice Performance**: Optimized TTS (Text-to-Speech) latency and improved STT (Speech-to-Text) accuracy for Nigerian accents.
+- **UI/UX Polishing**: Fixed hydration errors, improved chat layout responsiveness, and standardized translation dictionaries across 4 languages.
+
+---
+
+## Deployment
+
+### Backend (Django)
+The backend is designed for deployment on platforms like Render, Railway, or VPS. Ensure you set the environment variables listed above.
+
+### Frontend (Next.js)
+Deploy the frontend to Vercel or Netlify for the best Next.js compatibility.
+
+---
+
 ## Author
 - **Author**: [Abdul-Salam15](https://github.com/Abdul-Salam15)
 - **License**: MIT

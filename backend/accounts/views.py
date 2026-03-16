@@ -103,20 +103,37 @@ def signup_step2(request):
     profile, created = FarmerProfile.objects.get_or_create(user=request.user)
     
     if request.method == 'POST':
-        if request.headers.get('Content-Type') == 'application/json':
-            data = json.loads(request.body)
-            form = FarmerProfileForm(data, instance=profile)
-        else:
-            form = FarmerProfileForm(request.POST, instance=profile)
+        try:
+            if request.headers.get('Content-Type') == 'application/json':
+                data = json.loads(request.body)
+                # Sanitize numeric fields: "" -> None
+                if 'farm_size_acres' in data and data['farm_size_acres'] == '':
+                    data['farm_size_acres'] = None
+                form = FarmerProfileForm(data, instance=profile)
+            else:
+                form = FarmerProfileForm(request.POST, instance=profile)
 
-        if form.is_valid():
-            form.save()
+            if form.is_valid():
+                profile = form.save()
+                # Sync user model names
+                user = request.user
+                if profile.first_name:
+                    user.first_name = profile.first_name
+                if profile.last_name:
+                    user.last_name = profile.last_name
+                user.save()
+                
+                if request.headers.get('Content-Type') == 'application/json':
+                    return JsonResponse({'success': True, 'message': 'Profile updated!'})
+                return redirect('index')
+            else:
+                if request.headers.get('Content-Type') == 'application/json':
+                    return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+        except Exception as e:
+            print(f"DEBUG: Step 2 Exception: {str(e)}")
             if request.headers.get('Content-Type') == 'application/json':
-                return JsonResponse({'success': True, 'message': 'Profile updated!'})
-            return redirect('index')
-        else:
-            if request.headers.get('Content-Type') == 'application/json':
-                return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+                return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
     else:
         form = FarmerProfileForm(instance=profile)
     
@@ -333,6 +350,36 @@ def user_settings_view(request):
             return JsonResponse({'success': False, 'error': str(e)}, status=500)
             
     return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+
+@csrf_exempt
+def signup_step1(request):
+    if request.method == 'POST':
+        if request.headers.get('Content-Type') == 'application/json':
+            try:
+                data = json.loads(request.body)
+                form = CustomUserCreationForm(data)
+                if form.is_valid():
+                    user = form.save()
+                    login(request, user)
+                    return JsonResponse({'success': True, 'message': 'Account created!', 'redirect_url': '/accounts/signup/step2/'})
+                else:
+                    return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+            except json.JSONDecodeError:
+                return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+            except Exception as e:
+                return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        else:
+            form = CustomUserCreationForm(request.POST)
+            if form.is_valid():
+                user = form.save()
+                login(request, user)
+                return redirect('signup_step2')
+            else:
+                messages.error(request, 'Please correct the errors below.')
+    else:
+        form = CustomUserCreationForm()
+    
+    return render(request, 'accounts/signup.html', {'form': form, 'step': 1})
 
 @login_required
 def update_language_preference(request):

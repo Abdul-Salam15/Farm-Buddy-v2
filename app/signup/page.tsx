@@ -14,6 +14,7 @@ import {
   SelectValue 
 } from "@/components/ui/select"
 import { Eye, EyeOff, Sprout, ArrowRight, Check, Users, Shield, MapPin, Ruler, Droplets, Bug, Sprout as Plant } from "lucide-react"
+import { useTranslation } from "@/app/i18n/LanguageContext"
 
 const LANGUAGE_CHOICES = [
   { value: 'en', label: 'English' },
@@ -22,35 +23,36 @@ const LANGUAGE_CHOICES = [
   { value: 'yo', label: 'Yoruba' },
 ]
 
-const SOIL_TYPE_CHOICES = [
-  { value: 'sandy', label: 'Sandy' },
-  { value: 'loamy', label: 'Loamy' },
-  { value: 'clay', label: 'Clay' },
-  { value: 'silt', label: 'Silty' },
-  { value: 'peaty', label: 'Peaty' },
-  { value: 'chalky', label: 'Chalky' },
-  { value: 'unknown', label: 'I am not sure' },
-]
-
-const PH_CHOICES = [
-  { value: 'acidic', label: 'Acidic (tastes sour, kills grass)' },
-  { value: 'neutral', label: 'Neutral (normal soil)' },
-  { value: 'alkaline', label: 'Alkaline (white crust on soil surface)' },
-  { value: 'unknown', label: 'I am not sure' },
-]
-
-const WATER_CHOICES = [
-  { value: 'rainfed', label: 'Rainfed only' },
-  { value: 'irrigated', label: 'I have irrigation' },
-  { value: 'seasonal', label: 'Seasonal stream / borehole' },
-]
-
 export default function SignupPage() {
+  const { t } = useTranslation()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [step, setStep] = useState(1)
   const router = useRouter()
+
+  const SOIL_TYPE_CHOICES = [
+    { value: 'sandy', label: t('profile.soil_types.sandy') },
+    { value: 'loamy', label: t('profile.soil_types.loamy') },
+    { value: 'clay', label: t('profile.soil_types.clay') },
+    { value: 'silt', label: t('profile.soil_types.silt') },
+    { value: 'peaty', label: t('profile.soil_types.peaty') },
+    { value: 'chalky', label: t('profile.soil_types.chalky') },
+    { value: 'unknown', label: t('profile.soil_types.unknown') },
+  ]
+
+  const PH_CHOICES = [
+    { value: 'acidic', label: t('profile.ph_levels.acidic') },
+    { value: 'neutral', label: t('profile.ph_levels.neutral') },
+    { value: 'alkaline', label: t('profile.ph_levels.alkaline') },
+    { value: 'unknown', label: t('profile.ph_levels.unknown') },
+  ]
+
+  const WATER_CHOICES = [
+    { value: 'rainfed', label: t('profile.water_sources.rainfed') },
+    { value: 'irrigated', label: t('profile.water_sources.irrigated') },
+    { value: 'seasonal', label: t('profile.water_sources.seasonal') },
+  ]
 
   // State for Step 1
   const [formData, setFormData] = useState({
@@ -88,7 +90,7 @@ export default function SignupPage() {
     
     if (step === 1) {
       if (formData.password !== formData.confirmPassword) {
-        alert("Passwords do not match!")
+        alert(t('settings.alert_password_mismatch'))
         return
       }
       
@@ -132,16 +134,13 @@ export default function SignupPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        // We need to send cookies to stay logged in from step 1
-        // Fetch does not send cookies by default to different origins
-        // We can use credentials: 'include'
         credentials: "include",
         body: JSON.stringify({
           preferred_language: formData.preferred_language,
           first_name: formData.first_name,
           last_name: formData.last_name,
           location: formData.location,
-          farm_size_acres: formData.farm_size_acres,
+          farm_size_acres: formData.farm_size_acres === '' ? null : formData.farm_size_acres,
           soil_type: formData.soil_type,
           ph_level: formData.ph_level,
           water_source: formData.water_source,
@@ -181,12 +180,12 @@ export default function SignupPage() {
         
         <div className="max-w-md">
           <h1 className="text-4xl font-bold leading-tight text-sidebar-foreground">
-            {step === 1 ? "Join thousands of farmers" : "About your farming environment"}
+            {step === 1 ? t('auth.create_account') : t('auth.farm_details')}
           </h1>
           <p className="mt-4 text-lg text-sidebar-foreground/70">
             {step === 1 
-              ? "Create your free account and start getting AI-powered agricultural advice tailored to your farm."
-              : "This information helps us provide you with the most accurate advice for your specific soil and crops."
+              ? t('auth.step1_subtitle')
+              : t('auth.step2_subtitle')
             }
           </p>
           
@@ -196,9 +195,9 @@ export default function SignupPage() {
                 <Users className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <h3 className="font-medium text-sidebar-foreground">Community Driven</h3>
+                <h3 className="font-medium text-sidebar-foreground">{t('landing.community_stats')}</h3>
                 <p className="mt-1 text-sm text-sidebar-foreground/60">
-                  Join a growing community of farmers sharing knowledge and best practices.
+                  {t('landing.community_subtitle')}
                 </p>
               </div>
             </div>
@@ -207,9 +206,9 @@ export default function SignupPage() {
                 <Shield className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <h3 className="font-medium text-sidebar-foreground">Secure & Private</h3>
+                <h3 className="font-medium text-sidebar-foreground">{t('landing.features.expert.title')}</h3>
                 <p className="mt-1 text-sm text-sidebar-foreground/60">
-                  Your farm data is encrypted and never shared with third parties.
+                   {t('landing.features.expert.desc')}
                 </p>
               </div>
             </div>
@@ -217,7 +216,7 @@ export default function SignupPage() {
         </div>
         
         <p className="text-sm text-sidebar-foreground/50">
-          Trusted by 10,000+ farmers across Nigeria
+          {t('auth.footer_empower')}
         </p>
       </div>
 
@@ -263,12 +262,12 @@ export default function SignupPage() {
 
             <div className="mb-8">
               <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                {step === 1 ? "Create your account" : "Farm Details"}
+                {step === 1 ? t('auth.create_account') : t('auth.farm_details')}
               </h2>
               <p className="mt-2 text-muted-foreground">
                 {step === 1
-                  ? "Enter your details to get started"
-                  : "Final step: About your farming environment"}
+                  ? t('auth.step1_subtitle')
+                  : t('auth.step2_subtitle')}
               </p>
             </div>
 
@@ -277,11 +276,11 @@ export default function SignupPage() {
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="username" className="text-sm font-medium">
-                      Username
+                      {t('auth.username')}
                     </Label>
                     <Input
                       id="username"
-                      placeholder="Choose a username"
+                      placeholder={t('auth.username_placeholder')}
                       required
                       value={formData.username}
                       onChange={handleChange}
@@ -291,12 +290,12 @@ export default function SignupPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="email" className="text-sm font-medium">
-                      Email
+                      {t('auth.email')}
                     </Label>
                     <Input
                       id="email"
                       type="email"
-                      placeholder="Enter your email address"
+                      placeholder={t('auth.email_placeholder')}
                       required
                       value={formData.email}
                       onChange={handleChange}
@@ -306,13 +305,13 @@ export default function SignupPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="password" className="text-sm font-medium">
-                      Password
+                      {t('auth.password')}
                     </Label>
                     <div className="relative">
                       <Input
                         id="password"
                         type={showPassword ? "text" : "password"}
-                        placeholder="Create a password"
+                        placeholder={t('auth.create_password_placeholder')}
                         required
                         value={formData.password}
                         onChange={handleChange}
@@ -334,13 +333,13 @@ export default function SignupPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="confirmPassword" className="text-sm font-medium">
-                      Confirm Password
+                      {t('auth.confirm_password')}
                     </Label>
                     <div className="relative">
                       <Input
                         id="confirmPassword"
                         type={showConfirmPassword ? "text" : "password"}
-                        placeholder="Confirm your password"
+                        placeholder={t('auth.confirm_password_placeholder')}
                         required
                         value={formData.confirmPassword}
                         onChange={handleChange}
@@ -364,7 +363,7 @@ export default function SignupPage() {
                 <div className="space-y-5">
                   <div className="space-y-2">
                     <Label htmlFor="preferred_language" className="text-sm font-medium">
-                      Preferred Language
+                      {t('profile.lang_pref')}
                     </Label>
                     <Select 
                       value={formData.preferred_language} 
@@ -384,7 +383,7 @@ export default function SignupPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="first_name" className="text-sm font-medium">
-                        First Name
+                        {t('profile.first_name')}
                       </Label>
                       <Input
                         id="first_name"
@@ -397,7 +396,7 @@ export default function SignupPage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="last_name" className="text-sm font-medium">
-                        Last Name
+                        {t('profile.last_name')}
                       </Label>
                       <Input
                         id="last_name"
@@ -412,12 +411,12 @@ export default function SignupPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="location" className="text-sm font-medium">
-                      Farm Location
+                      {t('profile.farm_location')}
                     </Label>
                     <div className="relative">
                       <Input
                         id="location"
-                        placeholder="Town, State"
+                        placeholder={t('profile.town_state')}
                         required
                         value={formData.location}
                         onChange={handleChange}
@@ -429,7 +428,7 @@ export default function SignupPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="farm_size_acres" className="text-sm font-medium">
-                      Farm size in acres
+                      {t('auth.farm_size')}
                     </Label>
                     <div className="relative">
                       <Input
@@ -439,6 +438,7 @@ export default function SignupPage() {
                         value={formData.farm_size_acres}
                         onChange={handleChange}
                         className="h-11 bg-input pl-10"
+                        step="0.01"
                       />
                       <Ruler className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
                     </div>
@@ -447,7 +447,7 @@ export default function SignupPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="soil_type" className="text-sm font-medium">
-                        Soil appearance
+                        {t('profile.soil_appearance')}
                       </Label>
                       <Select 
                         value={formData.soil_type} 
@@ -465,7 +465,7 @@ export default function SignupPage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="ph_level" className="text-sm font-medium">
-                        Soil description
+                        {t('profile.soil_acidity')}
                       </Label>
                       <Select 
                         value={formData.ph_level} 
@@ -485,7 +485,7 @@ export default function SignupPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="water_source" className="text-sm font-medium">
-                      Crop watering method
+                      {t('auth.watering_method')}
                     </Label>
                     <Select 
                       value={formData.water_source} 
@@ -504,7 +504,7 @@ export default function SignupPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="current_crops" className="text-sm font-medium">
-                      Current crops
+                      {t('profile.current_crops')}
                     </Label>
                     <div className="relative">
                       <Input
@@ -520,7 +520,7 @@ export default function SignupPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="past_crops" className="text-sm font-medium">
-                      Previous crops
+                      {t('profile.previous_crops')}
                     </Label>
                     <Input
                       id="past_crops"
@@ -533,7 +533,7 @@ export default function SignupPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="top_pests" className="text-sm font-medium">
-                      Top Pests
+                      {t('profile.main_pests')}
                     </Label>
                     <div className="relative">
                       <Input
@@ -550,7 +550,7 @@ export default function SignupPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="has_livestock" className="text-sm font-medium">
-                        Keep animals?
+                        {t('auth.keep_animals')}
                       </Label>
                       <Select 
                         value={formData.has_livestock ? "true" : "false"} 
@@ -560,15 +560,15 @@ export default function SignupPage() {
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="true">Yes</SelectItem>
-                          <SelectItem value="false">No</SelectItem>
+                          <SelectItem value="true">{t('profile.livestock_options.yes')}</SelectItem>
+                          <SelectItem value="false">{t('profile.livestock_options.no')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     {formData.has_livestock && (
                       <div className="space-y-2">
                         <Label htmlFor="livestock_types" className="text-sm font-medium">
-                          What kinds?
+                          {t('auth.what_kinds')}
                         </Label>
                         <Input
                           id="livestock_types"
@@ -591,7 +591,7 @@ export default function SignupPage() {
                     className="h-11 flex-1"
                     onClick={() => setStep(1)}
                   >
-                    Back
+                    {t('auth.back')}
                   </Button>
                 )}
                 <Button
@@ -603,12 +603,12 @@ export default function SignupPage() {
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
                   ) : step === 1 ? (
                     <>
-                      Continue
+                      {t('auth.continue')}
                       <ArrowRight className="h-4 w-4" />
                     </>
                   ) : (
                     <>
-                      Create Account
+                      {t('auth.create_account')}
                       <Check className="h-4 w-4" />
                     </>
                   )}
@@ -617,12 +617,12 @@ export default function SignupPage() {
             </form>
 
             <p className="mt-8 text-center text-sm text-muted-foreground">
-              Already have an account?{" "}
+              {t('auth.already_account')}
               <Link
                 href="/login"
                 className="font-medium text-primary hover:underline"
               >
-                Sign in
+                {t('auth.signin_link')}
               </Link>
             </p>
           </div>

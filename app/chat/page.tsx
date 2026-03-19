@@ -95,6 +95,8 @@ export default function ChatPage() {
   const audioChunksRef = useRef<Blob[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const isAutoScrollingRef = useRef(true)
 
   const quickActions = [
     { icon: Leaf, label: t("chat.quick_actions.crop_disease") },
@@ -103,13 +105,28 @@ export default function ChatPage() {
     { icon: BookOpen, label: t("chat.quick_actions.best_practices") },
   ]
 
-  const scrollToBottom = useCallback(() => {
-    if (scrollAreaRef.current) {
-      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]')
-      if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight
-      }
+  const scrollToBottom = useCallback((force = false) => {
+    if (force || isAutoScrollingRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: force ? "smooth" : "auto" })
     }
+  }, [])
+
+  useEffect(() => {
+    const scrollArea = scrollAreaRef.current
+    if (!scrollArea) return
+
+    const viewport = scrollArea.querySelector('[data-radix-scroll-area-viewport]')
+    if (!viewport) return
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = viewport
+      // If user is within 100px of bottom, enable auto-scroll
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 100
+      isAutoScrollingRef.current = isAtBottom
+    }
+
+    viewport.addEventListener('scroll', handleScroll)
+    return () => viewport.removeEventListener('scroll', handleScroll)
   }, [])
 
   useEffect(() => {
@@ -391,6 +408,7 @@ export default function ChatPage() {
     setPreviewUrl(null)
     setUploadProgress(0)
     setIsLoading(true)
+    isAutoScrollingRef.current = true // Force auto-scroll for new user message
 
     try {
       let response;

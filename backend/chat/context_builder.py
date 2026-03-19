@@ -14,7 +14,7 @@ def build_system_prompt(user):
     past = (
         Message.objects
         .filter(conversation__user=user, role='assistant')
-        .order_by('-created_at')[:10]
+        .order_by('-created_at')[:5]
     )
 
     history_text = ''

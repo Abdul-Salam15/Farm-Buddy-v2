@@ -97,6 +97,7 @@ def ask_gemini(messages_history: list, weather_context=None, profile_context=Non
                         if chunk.parts and chunk.parts[0].function_call:
                             fn = chunk.parts[0].function_call
                             if fn.name == "check_weather_for_ai":
+                                yield f" [Status: Gathering weather info for {fn.args.get('city_name', 'your location')}...] "
                                 args = {key: val for key, val in fn.args.items()}
                                 weather_result = check_weather_for_ai(**args)
                                 
@@ -196,7 +197,7 @@ def summarize_title(text):
     Generate a short 5-word summary title for a conversation based on the first prompt
     """
     try:
-        model = genai.GenerativeModel('gemini-flash-latest')
+        model = genai.GenerativeModel("gemini-flash-latest")
         # Use simple model for summarization
         prompt = f"Summarize the following text into a short title of maximum 5 words. Do not use quotes or special characters. Text: {text}"
         response = model.generate_content(prompt)

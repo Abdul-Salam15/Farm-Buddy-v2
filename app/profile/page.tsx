@@ -88,7 +88,7 @@ export default function ProfilePage() {
     const cityName = location.split(',')[0].trim()
 
     try {
-      const response = await fetch("${API_BASE_URL}/chat/api/weather/", {
+      const response = await fetch(`${API_BASE_URL}/chat/api/weather/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -128,7 +128,7 @@ export default function ProfilePage() {
     const fetchProfile = async () => {
       setIsLoading(true)
       try {
-        const response = await fetch("${API_BASE_URL}/accounts/profile/", {
+        const response = await fetch(`${API_BASE_URL}/accounts/profile/`, {
           headers: {
             "Accept": "application/json",
           },
@@ -172,7 +172,7 @@ export default function ProfilePage() {
     if (id === 'preferred_language' && typeof value === 'string') {
       setLanguage(value)
       try {
-        await fetch("${API_BASE_URL}/accounts/update-language/", {
+        await fetch(`${API_BASE_URL}/accounts/update-language/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
@@ -188,7 +188,7 @@ export default function ProfilePage() {
     e.preventDefault()
     setIsSaving(true)
     try {
-      const response = await fetch("${API_BASE_URL}/accounts/profile/", {
+      const response = await fetch(`${API_BASE_URL}/accounts/profile/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -214,7 +214,7 @@ export default function ProfilePage() {
 
   const handleLogout = async () => {
     try {
-      await fetch("${API_BASE_URL}/accounts/logout/", {
+      await fetch(`${API_BASE_URL}/accounts/logout/`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

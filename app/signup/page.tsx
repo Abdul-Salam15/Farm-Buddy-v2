@@ -98,7 +98,7 @@ export default function SignupPage() {
       
       setIsLoading(true)
       try {
-        const response = await fetch("${API_BASE_URL}/accounts/signup/", {
+        const response = await fetch(`${API_BASE_URL}/accounts/signup/`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -131,7 +131,7 @@ export default function SignupPage() {
     // Step 2 submission
     setIsLoading(true)
     try {
-      const response = await fetch("${API_BASE_URL}/accounts/signup/farm/", {
+      const response = await fetch(`${API_BASE_URL}/accounts/signup/farm/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

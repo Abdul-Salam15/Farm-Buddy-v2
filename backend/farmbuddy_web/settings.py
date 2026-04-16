@@ -23,12 +23,23 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-fallback-key-for-local-dev')
+# No fallback — missing SECRET_KEY in production is a hard startup failure.
+_secret_key = os.getenv('SECRET_KEY')
+if not _secret_key:
+    if os.getenv('DEBUG', 'True').lower() == 'true':
+        # Allow a dev-only insecure default so local setup works out of the box
+        _secret_key = 'django-insecure-dev-only-key-do-not-use-in-production'
+    else:
+        raise EnvironmentError(
+            "SECRET_KEY environment variable is not set. "
+            "Set it to a long random string before running in production."
+        )
+SECRET_KEY = _secret_key
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*' if DEBUG else '').split(',')
 
 # Frontend URLs for CORS and CSRF
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')

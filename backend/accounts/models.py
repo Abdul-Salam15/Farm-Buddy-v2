@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
+from django.contrib.auth.hashers import make_password
 
 
 class FarmerProfile(models.Model):
@@ -65,6 +66,11 @@ class FarmerProfile(models.Model):
             self.telegram_link_token = secrets.token_hex(16)
             self.save()
         return self.telegram_link_token
+
+    def set_security_answer(self, raw_answer):
+        """Hash and store the security answer. Always normalise to lowercase before hashing."""
+        self.security_answer = make_password(raw_answer.strip().lower())
+        self.save(update_fields=['security_answer'])
 
     def __str__(self):
         return f"{self.user.username}'s Profile"

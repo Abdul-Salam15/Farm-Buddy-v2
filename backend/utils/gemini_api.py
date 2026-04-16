@@ -6,9 +6,13 @@ from utils.weather_api import check_weather_for_ai
 
 load_dotenv(override=True)
 
-# Force reload triggers
-
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+# Support both GOOGLE_API_KEY (preferred) and GEMINI_API_KEY (legacy) env var names
+_api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+if not _api_key:
+    raise EnvironmentError(
+        "Missing Gemini API key. Set GOOGLE_API_KEY in your .env file."
+    )
+genai.configure(api_key=_api_key)
 
 # System instruction for the persona
 SYSTEM_INSTRUCTION = """
@@ -44,8 +48,13 @@ def ask_gemini(messages_history: list, weather_context=None, profile_context=Non
     language: Target language for the response ('en', 'ha', 'ig', 'yo').
     profile_context: Optional string containing user profile info.
     """
-    # Verify input
-    if not messages_history: return "Hello! How can I help you?"
+    # Verify input — always return a generator when stream=True to keep the caller contract
+    if not messages_history:
+        if stream:
+            def _empty_gen():
+                yield "Hello! How can I help you with farming today?"
+            return _empty_gen()
+        return "Hello! How can I help you with farming today?"
 
     # Language instruction mapping
     lang_instructions = {

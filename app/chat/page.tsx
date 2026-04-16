@@ -36,6 +36,7 @@ import {
 import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@/app/i18n/LanguageContext"
+import { API_BASE_URL } from "@/lib/config"
 
 interface Message {
   id: string | number
@@ -133,7 +134,7 @@ export default function ChatPage() {
     scrollToBottom()
   }, [messages, scrollToBottom])
 
-  const API_BASE = "http://localhost:8000/chat"
+  const API_BASE = `${API_BASE_URL}/chat`
 
   const fetchConversations = useCallback(async () => {
     try {
@@ -149,7 +150,7 @@ export default function ChatPage() {
 
   const fetchUserProfile = useCallback(async () => {
     try {
-      const res = await fetch(`http://localhost:8000/accounts/profile/`, {
+      const res = await fetch(`${API_BASE_URL}/accounts/profile/`, {
         headers: { 'Accept': 'application/json' },
         credentials: 'include'
       })
@@ -583,7 +584,7 @@ export default function ChatPage() {
 
   const handleLogout = async () => {
     try {
-      await fetch("http://localhost:8000/accounts/logout/", {
+      await fetch("${API_BASE_URL}/accounts/logout/", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -845,11 +846,11 @@ export default function ChatPage() {
                             <img
                               src={message.image_url.startsWith('blob:') || message.image_url.startsWith('data:') || message.image_url.startsWith('http')
                                 ? message.image_url
-                                : `http://localhost:8000${message.image_url}`
+                                : `${API_BASE_URL}${message.image_url}`
                               }
                               alt="Uploaded visual"
                               className="max-h-80 w-full object-contain transition-transform hover:scale-[1.02] cursor-pointer"
-                              onClick={() => window.open(message.image_url?.startsWith('blob:') ? message.image_url : `http://localhost:8000${message.image_url}`, '_blank')}
+                              onClick={() => window.open(message.image_url?.startsWith('blob:') ? message.image_url : `${API_BASE_URL}${message.image_url}`, '_blank')}
                             />
                           </div>
                         )}

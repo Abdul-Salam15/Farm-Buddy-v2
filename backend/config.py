@@ -1,4 +1,3 @@
-import os
-
-GEMINI_API_KEY = 'AIzaSyDNEZEk6OQRdmcgnjsQ1ljP8dW8LOMCBl8'
-os.environ["GEMINI_API_KEY"] = GEMINI_API_KEY
+# Configuration is loaded from environment variables via .env
+# Do NOT hardcode API keys or secrets here.
+# Set GOOGLE_API_KEY in your .env file.

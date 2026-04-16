@@ -22,6 +22,7 @@ import {
   LogOut,
 } from "lucide-react"
 import { useTranslation } from "@/app/i18n/LanguageContext"
+import { API_BASE_URL } from "@/lib/config"
 
 export default function SettingsPage() {
   const { t, setLanguage } = useTranslation()
@@ -48,7 +49,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const response = await fetch("http://localhost:8000/accounts/settings/", {
+        const response = await fetch("${API_BASE_URL}/accounts/settings/", {
           credentials: "include",
           headers: { "Accept": "application/json" }
         })
@@ -78,7 +79,7 @@ export default function SettingsPage() {
     e.preventDefault()
     setIsProfileLoading(true)
     try {
-      const response = await fetch("http://localhost:8000/accounts/settings/", {
+      const response = await fetch("${API_BASE_URL}/accounts/settings/", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -112,7 +113,7 @@ export default function SettingsPage() {
     }
     setIsPasswordLoading(true)
     try {
-      const response = await fetch("http://localhost:8000/accounts/settings/", {
+      const response = await fetch("${API_BASE_URL}/accounts/settings/", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -215,7 +216,7 @@ export default function SettingsPage() {
                     onValueChange={async (value) => {
                       setSettingsData({ ...settingsData, preferred_language: value })
                       try {
-                        await fetch("http://localhost:8000/accounts/update-language/", {
+                        await fetch("${API_BASE_URL}/accounts/update-language/", {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
                           credentials: "include",

@@ -584,7 +584,7 @@ export default function ChatPage() {
 
   const handleLogout = async () => {
     try {
-      await fetch("${API_BASE_URL}/accounts/logout/", {
+      await fetch(`${API_BASE_URL}/accounts/logout/`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

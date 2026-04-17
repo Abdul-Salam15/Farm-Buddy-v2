@@ -159,7 +159,9 @@ export default function SignupPage() {
       if (data.success) {
         router.push("/chat")
       } else {
-        const errorMsg = data.errors ? Object.values(data.errors).flat().join(", ") : "Profile setup failed"
+        const errorMsg = data.errors
+          ? Object.values(data.errors).flat().join(", ")
+          : data.error || "Profile setup failed"
         alert(errorMsg)
       }
     } catch (error) {

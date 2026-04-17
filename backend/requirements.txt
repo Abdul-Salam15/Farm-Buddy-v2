@@ -1,4 +1,5 @@
 django>=6.0
+django-cors-headers
 python-dotenv
 google-generativeai
 python-telegram-bot

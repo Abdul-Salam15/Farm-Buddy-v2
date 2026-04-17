@@ -41,8 +41,8 @@ DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*' if DEBUG else '').split(',')
 
-# Frontend URLs for CORS and CSRF
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+# Frontend URLs for CORS and CSRF — strip trailing slash to keep origins valid
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000').rstrip('/')
 
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',

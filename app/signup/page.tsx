@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select"
 import { Eye, EyeOff, Sprout, ArrowRight, Check, Users, Shield, MapPin, Ruler, Droplets, Bug, Sprout as Plant } from "lucide-react"
 import { useTranslation } from "@/app/i18n/LanguageContext"
+import { API_BASE_URL } from "@/lib/config"
 
 const LANGUAGE_CHOICES = [
   { value: 'en', label: 'English' },
@@ -74,6 +75,7 @@ export default function SignupPage() {
     top_pests: '',
     has_livestock: false,
     livestock_types: '',
+    security_answer: '',
   })
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,7 +98,7 @@ export default function SignupPage() {
       
       setIsLoading(true)
       try {
-        const response = await fetch("http://localhost:8000/accounts/signup/", {
+        const response = await fetch(`${API_BASE_URL}/accounts/signup/`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -129,7 +131,7 @@ export default function SignupPage() {
     // Step 2 submission
     setIsLoading(true)
     try {
-      const response = await fetch("http://localhost:8000/accounts/signup/farm/", {
+      const response = await fetch(`${API_BASE_URL}/accounts/signup/farm/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -149,6 +151,7 @@ export default function SignupPage() {
           top_pests: formData.top_pests,
           has_livestock: formData.has_livestock,
           livestock_types: formData.livestock_types,
+          security_answer: formData.security_answer,
         }),
       })
 
@@ -545,6 +548,21 @@ export default function SignupPage() {
                       />
                       <Bug className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="security_answer" className="text-sm font-medium">
+                      Security Question: What is the name of your grandfather?
+                    </Label>
+                    <Input
+                      id="security_answer"
+                      placeholder="Used for password recovery"
+                      required
+                      value={formData.security_answer}
+                      onChange={handleChange}
+                      className="h-11 bg-input"
+                    />
+                    <p className="text-xs text-muted-foreground">This is used to recover your account if you forget your password.</p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">

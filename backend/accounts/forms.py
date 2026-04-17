@@ -21,7 +21,7 @@ class CustomUserCreationForm(UserCreationForm):
 class FarmerProfileForm(forms.ModelForm):
     class Meta:
         model = FarmerProfile
-        exclude = ['user', 'created_at', 'updated_at']
+        exclude = ['user', 'created_at', 'updated_at', 'telegram_chat_id', 'telegram_link_token']
         labels = {
             'first_name': 'First name',
             'last_name': 'Last name',
@@ -46,6 +46,7 @@ class UserSettingsForm(forms.Form):
     first_name = forms.CharField(max_length=150, required=False, label="First Name")
     last_name = forms.CharField(max_length=150, required=False, label="Last Name")
     preferred_language = forms.ChoiceField(choices=FarmerProfile.LANGUAGE_CHOICES, required=True, label="Default Language")
+    security_answer = forms.CharField(max_length=200, required=False, label="Security Answer (grandfather's name)")
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)
@@ -65,7 +66,7 @@ class UserSettingsForm(forms.Form):
             self.user.save()
 
             # Use update_or_create to avoid IntegrityError on required fields for new users
-            FarmerProfile.objects.update_or_create(
+            profile, _ = FarmerProfile.objects.update_or_create(
                 user=self.user,
                 defaults={
                     'first_name': self.cleaned_data['first_name'],
@@ -73,3 +74,8 @@ class UserSettingsForm(forms.Form):
                     'preferred_language': self.cleaned_data['preferred_language'],
                 }
             )
+
+            # Hash and store the security answer if provided
+            raw_answer = self.cleaned_data.get('security_answer', '').strip()
+            if raw_answer:
+                profile.set_security_answer(raw_answer)

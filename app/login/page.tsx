@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Eye, EyeOff, Sprout, ArrowRight, Leaf } from "lucide-react"
 import { useTranslation } from "@/app/i18n/LanguageContext"
+import { API_BASE_URL } from "@/lib/config"
 
 export default function LoginPage() {
   const { t } = useTranslation()
@@ -24,7 +25,7 @@ export default function LoginPage() {
       const username = (form.elements.namedItem('username') as HTMLInputElement).value
       const password = (form.elements.namedItem('password') as HTMLInputElement).value
 
-      const response = await fetch("http://localhost:8000/accounts/login/", {
+      const response = await fetch(`${API_BASE_URL}/accounts/login/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

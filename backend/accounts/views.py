@@ -2,7 +2,10 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout
 from django.contrib.auth.forms import AuthenticationForm, PasswordChangeForm
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
+from django.contrib.auth.hashers import check_password as check_hashed_password
 from django.contrib import messages
+from django.views.decorators.http import require_POST
 from .forms import CustomUserCreationForm, FarmerProfileForm, UserSettingsForm
 from .models import FarmerProfile
 import json
@@ -126,6 +129,12 @@ def signup_step2(request):
 
             if form.is_valid():
                 profile = form.save()
+
+                # Hash the security answer if submitted in plaintext
+                raw_answer = data.get('security_answer', '').strip() if request.headers.get('Content-Type') == 'application/json' else request.POST.get('security_answer', '').strip()
+                if raw_answer:
+                    profile.set_security_answer(raw_answer)
+
                 # Sync user model names
                 user = request.user
                 if profile.first_name:
@@ -133,7 +142,7 @@ def signup_step2(request):
                 if profile.last_name:
                     user.last_name = profile.last_name
                 user.save()
-                
+
                 if request.headers.get('Content-Type') == 'application/json':
                     return JsonResponse({'success': True, 'message': 'Profile updated!'})
                 return redirect('index')
@@ -181,6 +190,7 @@ def login_view(request):
     return render(request, 'accounts/login.html', {'form': form})
 
 
+@require_POST
 @csrf_exempt
 def logout_view(request):
     logout(request)
@@ -411,28 +421,37 @@ def forgot_password_view(request):
                 user = User.objects.get(username__iexact=username)
                 profile = user.farmerprofile
             except (User.DoesNotExist, FarmerProfile.DoesNotExist):
-                return JsonResponse({'success': False, 'error': 'User not found'}, status=404)
-            
+                # Use identical message to prevent username enumeration
+                return JsonResponse({'success': False, 'error': 'If this account exists, recovery is available.'}, status=404)
+
             if action == 'get_question':
-                # We use a hardcoded question "What is the name of your grand father?"
-                # but we could also store dynamic questions.
                 return JsonResponse({
                     'success': True,
                     'question': "What is the name of your grand father?",
                     'has_answer': bool(profile.security_answer)
                 })
-                
+
             elif action == 'reset_password':
-                answer = data.get('answer')
-                new_password = data.get('new_password')
-                
+                answer = data.get('answer', '')
+                new_password = data.get('new_password', '')
+
                 if not profile.security_answer:
                     return JsonResponse({'success': False, 'error': 'Security question not set for this account.'}, status=400)
-                
-                if answer.strip().lower() == profile.security_answer.strip().lower():
-                    if len(new_password) < 6:
-                        return JsonResponse({'success': False, 'error': 'Password must be at least 6 characters'}, status=400)
-                    
+
+                # Support both legacy plaintext answers and new hashed answers
+                answer_matches = False
+                stored = profile.security_answer
+                if stored.startswith('pbkdf2_') or stored.startswith('bcrypt') or stored.startswith('argon2'):
+                    answer_matches = check_hashed_password(answer.strip().lower(), stored)
+                else:
+                    # Legacy plaintext — compare and migrate to hashed
+                    answer_matches = (answer.strip().lower() == stored.strip().lower())
+                    if answer_matches:
+                        profile.set_security_answer(answer.strip().lower())
+
+                if answer_matches:
+                    if len(new_password) < 8:
+                        return JsonResponse({'success': False, 'error': 'Password must be at least 8 characters'}, status=400)
                     user.set_password(new_password)
                     user.save()
                     return JsonResponse({'success': True, 'message': 'Password reset successful!'})

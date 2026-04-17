@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/chart"
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, CartesianGrid } from "recharts"
 import { useTranslation } from "@/app/i18n/LanguageContext"
+import { API_BASE_URL } from "@/lib/config"
 
 // Helper to get CSRF cookie
 function getCsrfToken(): string {
@@ -95,7 +96,7 @@ export default function ProfilePage() {
     const cityName = location.split(',')[0].trim()
 
     try {
-      const response = await fetch("http://localhost:8000/chat/api/weather/", {
+      const response = await fetch(`${API_BASE_URL}/chat/api/weather/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -135,7 +136,7 @@ export default function ProfilePage() {
     const fetchProfile = async () => {
       setIsLoading(true)
       try {
-        const response = await fetch("http://localhost:8000/accounts/profile/", {
+        const response = await fetch(`${API_BASE_URL}/accounts/profile/`, {
           headers: {
             "Accept": "application/json",
           },
@@ -179,7 +180,7 @@ export default function ProfilePage() {
     if (id === 'preferred_language' && typeof value === 'string') {
       setLanguage(value)
       try {
-        await fetch("http://localhost:8000/accounts/update-language/", {
+        await fetch(`${API_BASE_URL}/accounts/update-language/`, {
           method: "POST",
           headers: { 
             "Content-Type": "application/json",
@@ -198,7 +199,7 @@ export default function ProfilePage() {
     e.preventDefault()
     setIsSaving(true)
     try {
-      const response = await fetch("http://localhost:8000/accounts/profile/", {
+      const response = await fetch(`${API_BASE_URL}/accounts/profile/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -225,7 +226,7 @@ export default function ProfilePage() {
 
   const handleLogout = async () => {
     try {
-      await fetch("http://localhost:8000/accounts/logout/", {
+      await fetch(`${API_BASE_URL}/accounts/logout/`, {
         method: "POST",
         credentials: "include",
         headers: { 

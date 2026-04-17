@@ -64,6 +64,10 @@ def parse_xai_refs(response_text):
     if '[FARMBUDDY_REFS]' not in response_text:
         return response_text, refs
 
+    # Require both the opening AND closing tag to avoid swallowing the entire response
+    if '[/FARMBUDDY_REFS]' not in response_text:
+        return response_text, refs
+
     parts = response_text.split('[FARMBUDDY_REFS]')
     clean_text = parts[0].strip()
     ref_block = parts[1].split('[/FARMBUDDY_REFS]')[0]

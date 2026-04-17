@@ -128,8 +128,9 @@ def send_message(request):
             content=user_message
         )
         
-        # Get conversation history for context
-        messages_history = list(conversation.messages.all().values('role', 'content'))
+        # Fetch only the last 10 messages at the DB layer to avoid loading full history
+        recent_qs = conversation.messages.order_by('-created_at')[:10]
+        messages_history = list(reversed(list(recent_qs.values('role', 'content'))))
         
         # Generator for streaming response
         def response_generator():
@@ -140,7 +141,14 @@ def send_message(request):
                 except Exception:
                     system_prompt = ''
 
+                # Expire weather context after 3 hours (10800 seconds)
+                import time as _time
                 weather_context = request.session.get('weather_context') or ''
+                weather_ts = request.session.get('weather_context_ts', 0)
+                if weather_context and (_time.time() - weather_ts) > 10800:
+                    weather_context = ''
+                    request.session.pop('weather_context', None)
+                    request.session.pop('weather_context_ts', None)
                 combined_context = system_prompt + "\n\n" + weather_context if system_prompt else weather_context
 
                 stream = ask_gemini(messages_history, weather_context=combined_context, stream=True, language=language)
@@ -287,6 +295,18 @@ def upload_image(request):
         is_valid, error_msg = validate_image(image_file)
         if not is_valid:
             return JsonResponse({'success': False, 'error': error_msg}, status=400)
+
+        # Compress image before storing (resize to ≤1024×1024, JPEG quality 85)
+        from utils.image_processing import compress_image
+        from django.core.files.uploadedfile import InMemoryUploadedFile
+        try:
+            compressed = compress_image(image_file)
+            image_file = InMemoryUploadedFile(
+                compressed, 'image', 'plant.jpg', 'image/jpeg', compressed.getbuffer().nbytes, None
+            )
+        except Exception:
+            # If compression fails, fall through with the original file
+            image_file.seek(0)
         
         # Get current conversation — enforce ownership
         conversation_id = request.POST.get('conversation_id') or request.session.get('conversation_id')
@@ -462,8 +482,10 @@ def get_weather_data(request):
         
         full_report = f"{current_report}\n\n{forecast_report}"
         
-        # Store in session for use in next chat message
+        # Store in session with a timestamp so stale weather is not injected indefinitely
+        import time
         request.session['weather_context'] = full_report
+        request.session['weather_context_ts'] = time.time()
         
         return JsonResponse({
             'success': True, 
@@ -490,6 +512,12 @@ def transcribe_audio(request):
             return JsonResponse({'success': False, 'error': 'Audio exceeds 10MB limit.'}, status=400)
             
         language = request.POST.get('language', 'en')
+
+        # Use a secure random temp path — never trust the client-supplied filename
+        import uuid, tempfile
+        suffix = '.webm'
+        temp_fd, temp_path = tempfile.mkstemp(suffix=suffix, prefix='farmbuddy_audio_')
+        os.close(temp_fd)
         if language not in ['en', 'ha', 'ig', 'yo']:
             language = 'en'
         

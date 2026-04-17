@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { ArrowLeft, Loader2, KeyRound, User as UserIcon, ShieldCheck } from "lucide-react"
+import { API_BASE_URL } from "@/lib/config"
 
 export default function ForgotPasswordPage() {
   const router = useRouter()
@@ -26,7 +27,7 @@ export default function ForgotPasswordPage() {
     
     setLoading(true)
     try {
-      const res = await fetch("/api/accounts/forgot-password/", {
+      const res = await fetch(`${API_BASE_URL}/accounts/forgot-password/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "get_question", username }),
@@ -63,7 +64,7 @@ export default function ForgotPasswordPage() {
 
     setLoading(true)
     try {
-      const res = await fetch("/api/accounts/forgot-password/", {
+      const res = await fetch(`${API_BASE_URL}/accounts/forgot-password/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -128,21 +129,44 @@ export default function ForgotPasswordPage() {
           )}
 
           {step === 2 && (
-            <form onSubmit={(e) => { e.preventDefault(); setStep(3); }} className="space-y-4">
+            <form onSubmit={async (e) => {
+              e.preventDefault()
+              if (!answer) return
+              setLoading(true)
+              try {
+                const res = await fetch(`${API_BASE_URL}/accounts/forgot-password/`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ action: "reset_password", username, answer, new_password: "VERIFY_ONLY_placeholder_do_not_use" }),
+                })
+                // We only need to know if the answer is correct.
+                // A 400 with "Incorrect security answer" means wrong; any other response means correct.
+                const data = await res.json()
+                if (data.success || (data.error && !data.error.includes("Incorrect"))) {
+                  setStep(3)
+                } else {
+                  toast.error("Incorrect answer. Please try again.")
+                }
+              } catch {
+                toast.error("An error occurred. Please try again.")
+              } finally {
+                setLoading(false)
+              }
+            }} className="space-y-4">
               <div className="space-y-2">
                 <Label className="text-sm font-medium flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4 text-primary" />
                   {question}
                 </Label>
-                <Input 
-                  placeholder="Your answer" 
+                <Input
+                  placeholder="Your answer"
                   value={answer}
                   onChange={(e) => setAnswer(e.target.value)}
-                  required 
+                  required
                 />
               </div>
-              <Button type="submit" className="w-full">
-                Verify Answer
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verify Answer"}
               </Button>
             </form>
           )}

@@ -62,7 +62,7 @@
     "error_speech": "Speech recognition is not supported in this browser.",
     "error_location_perm": "Could not get your location. Please check permissions.",
     "error_location_support": "Geolocation is not supported by your browser",
-    "weather_update": "I\\'ve updated your farm\\'s weather context. Currently: {description}, {temp}°C. How can I help you today based on this?",
+    "weather_update": "I've updated your farm's weather context. Currently: {description}, {temp}°C. How can I help you today based on this?",
     "input_placeholder": "Ask your FarmBuddy...",
     "quick_actions": {
       "crop_disease": "Crop disease diagnosis",

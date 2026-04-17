@@ -88,6 +88,8 @@ def send_message(request):
         data = json.loads(request.body)
         user_message = data.get('message', '').strip()
         language = data.get('language', 'en')
+        if language not in ['en', 'ha', 'ig', 'yo']:
+            language = 'en'
         conversation_id = data.get('conversation_id') # Explicit ID support
         
         if not user_message:
@@ -285,7 +287,10 @@ def upload_image(request):
             return JsonResponse({'success': False, 'error': 'No image provided'}, status=400)
         
         image_file = request.FILES['image']
-
+        
+        if image_file.size > 5 * 1024 * 1024:
+            return JsonResponse({'success': False, 'error': 'Image exceeds 5MB limit.'}, status=400)
+        
         # Validate image
         is_valid, error_msg = validate_image(image_file)
         if not is_valid:
@@ -503,6 +508,9 @@ def transcribe_audio(request):
             return JsonResponse({'success': False, 'error': 'No audio provided'}, status=400)
             
         audio_file = request.FILES['audio']
+        if audio_file.size > 10 * 1024 * 1024:
+            return JsonResponse({'success': False, 'error': 'Audio exceeds 10MB limit.'}, status=400)
+            
         language = request.POST.get('language', 'en')
 
         # Use a secure random temp path — never trust the client-supplied filename
@@ -510,6 +518,11 @@ def transcribe_audio(request):
         suffix = '.webm'
         temp_fd, temp_path = tempfile.mkstemp(suffix=suffix, prefix='farmbuddy_audio_')
         os.close(temp_fd)
+        if language not in ['en', 'ha', 'ig', 'yo']:
+            language = 'en'
+        
+        # Save temp file
+        temp_path = f"temp_{audio_file.name}"
         with open(temp_path, 'wb+') as destination:
             for chunk in audio_file.chunks():
                 destination.write(chunk)
@@ -572,6 +585,7 @@ def load_mms_model(lang_code):
         return None, None
 
 @csrf_exempt
+@require_http_methods(["GET", "POST"])
 def speak_text(request):
     """Convert text to speech using YarnGPT APIs"""
     if not request.user.is_authenticated:
@@ -585,6 +599,9 @@ def speak_text(request):
         else:
             text = request.GET.get('text', '').strip()
             language = request.GET.get('language', 'en')
+            
+        if language not in ['en', 'ha', 'ig', 'yo']:
+            language = 'en'
         
         if not text:
             return JsonResponse({'success': False, 'error': 'No text provided'}, status=400)

@@ -24,7 +24,7 @@ Your goal is to provide accurate, practical, and easy-to-understand farming advi
 """
 
 model = genai.GenerativeModel(
-    "gemini-flash-lite-latest",
+    "gemini-flash-latest",
     system_instruction=SYSTEM_INSTRUCTION,
     tools=[check_weather_for_ai]
 )
@@ -206,7 +206,7 @@ def summarize_title(text):
     Generate a short 5-word summary title for a conversation based on the first prompt
     """
     try:
-        model = genai.GenerativeModel("gemini-flash-latest")
+        model = genai.GenerativeModel("gemini-1.5-flash")
         # Use simple model for summarization
         prompt = f"Summarize the following text into a short title of maximum 5 words. Do not use quotes or special characters. Text: {text}"
         response = model.generate_content(prompt)

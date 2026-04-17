@@ -11,9 +11,14 @@ from .models import FarmerProfile
 import json
 import random
 import os
+import logging
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods, require_POST
+from django.contrib.auth.models import User
 from chat.models import Message
+
+logger = logging.getLogger(__name__)
 
 # Daily suggestions for different languages
 TIPS = {
@@ -72,25 +77,31 @@ SUGGESTIONS = [
 @csrf_exempt
 def signup_step1(request):
     if request.method == 'POST':
-        if request.headers.get('Content-Type') == 'application/json':
-            data = json.loads(request.body)
-            # Map password to password1/password2 for CustomUserCreationForm
-            data['password1'] = data.get('password')
-            data['password2'] = data.get('confirmPassword')
-            form = CustomUserCreationForm(data)
-        else:
-            form = CustomUserCreationForm(request.POST)
-
-        if form.is_valid():
-            user = form.save()
-            login(request, user)
+        try:
             if request.headers.get('Content-Type') == 'application/json':
-                return JsonResponse({'success': True, 'message': 'Account created successfully!'})
-            messages.success(request, "Account created successfully! Welcome to FarmBuddy.")
-            return redirect('signup_step2')
-        else:
-            if request.headers.get('Content-Type') == 'application/json':
-                return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+                data = json.loads(request.body)
+                # Map password to password1/password2 for CustomUserCreationForm
+                data['password1'] = data.get('password')
+                data['password2'] = data.get('confirmPassword')
+                form = CustomUserCreationForm(data)
+            else:
+                form = CustomUserCreationForm(request.POST)
+    
+            if form.is_valid():
+                user = form.save()
+                login(request, user)
+                if request.headers.get('Content-Type') == 'application/json':
+                    return JsonResponse({'success': True, 'message': 'Account created successfully!'})
+                messages.success(request, "Account created successfully! Welcome to FarmBuddy.")
+                return redirect('signup_step2')
+            else:
+                if request.headers.get('Content-Type') == 'application/json':
+                    return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+        except Exception:
+            logger.exception("signup_step1 error")
+            return JsonResponse({'success': False, 'error': 'Server error'}, status=500)
     else:
         form = CustomUserCreationForm()
     return render(request, 'accounts/signup.html', {'form': form, 'step': 1})
@@ -139,9 +150,9 @@ def signup_step2(request):
                 if request.headers.get('Content-Type') == 'application/json':
                     return JsonResponse({'success': False, 'errors': form.errors}, status=400)
         except Exception as e:
-            print(f"DEBUG: Step 2 Exception: {str(e)}")
+            logger.exception("signup_step2 error")
             if request.headers.get('Content-Type') == 'application/json':
-                return JsonResponse({'success': False, 'error': str(e)}, status=500)
+                return JsonResponse({'success': False, 'error': 'Server error'}, status=500)
 
     else:
         form = FarmerProfileForm(instance=profile)
@@ -152,22 +163,28 @@ def signup_step2(request):
 @csrf_exempt
 def login_view(request):
     if request.method == 'POST':
-        if request.headers.get('Content-Type') == 'application/json':
-            data = json.loads(request.body)
-            form = AuthenticationForm(data=data)
-        else:
-            form = AuthenticationForm(data=request.POST)
-
-        if form.is_valid():
-            user = form.get_user()
-            login(request, user)
+        try:
             if request.headers.get('Content-Type') == 'application/json':
-                return JsonResponse({'success': True, 'user': {'username': user.username, 'email': user.email}})
-            messages.success(request, f"Welcome back, {user.username}!")
-            return redirect('index')
-        else:
-            if request.headers.get('Content-Type') == 'application/json':
-                return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+                data = json.loads(request.body)
+                form = AuthenticationForm(data=data)
+            else:
+                form = AuthenticationForm(data=request.POST)
+    
+            if form.is_valid():
+                user = form.get_user()
+                login(request, user)
+                if request.headers.get('Content-Type') == 'application/json':
+                    return JsonResponse({'success': True, 'user': {'username': user.username, 'email': user.email}})
+                messages.success(request, f"Welcome back, {user.username}!")
+                return redirect('index')
+            else:
+                if request.headers.get('Content-Type') == 'application/json':
+                    return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+        except Exception:
+            logger.exception("login_view error")
+            return JsonResponse({'success': False, 'error': 'Server error'}, status=500)
     else:
         form = AuthenticationForm()
     return render(request, 'accounts/login.html', {'form': form})
@@ -182,33 +199,38 @@ def logout_view(request):
     return redirect('login')
 
 
-@csrf_exempt
 @login_required
 def profile_view(request):
     profile, _ = FarmerProfile.objects.get_or_create(user=request.user)
     
     if request.method == 'POST':
-        if request.headers.get('Content-Type') == 'application/json':
-            data = json.loads(request.body)
-            form = FarmerProfileForm(data, instance=profile)
-        else:
-            form = FarmerProfileForm(request.POST, instance=profile)
-
-        if form.is_valid():
-            profile = form.save()
-            # Sync with User model
-            user = request.user
-            user.first_name = profile.first_name or ""
-            user.last_name = profile.last_name or ""
-            user.save()
-            
+        try:
             if request.headers.get('Content-Type') == 'application/json':
-                return JsonResponse({'success': True, 'message': 'Farm Data updated successfully!'})
-            messages.success(request, 'Farm Data updated successfully!')
-            return redirect('profile')
-        else:
-            if request.headers.get('Content-Type') == 'application/json':
-                return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+                data = json.loads(request.body)
+                form = FarmerProfileForm(data, instance=profile)
+            else:
+                form = FarmerProfileForm(request.POST, instance=profile)
+    
+            if form.is_valid():
+                profile = form.save()
+                # Sync with User model
+                user = request.user
+                user.first_name = profile.first_name or ""
+                user.last_name = profile.last_name or ""
+                user.save()
+                
+                if request.headers.get('Content-Type') == 'application/json':
+                    return JsonResponse({'success': True, 'message': 'Farm Data updated successfully!'})
+                messages.success(request, 'Farm Data updated successfully!')
+                return redirect('profile')
+            else:
+                if request.headers.get('Content-Type') == 'application/json':
+                    return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+        except Exception:
+            logger.exception("profile_view error")
+            return JsonResponse({'success': False, 'error': 'Server error'}, status=500)
     else:
         form = FarmerProfileForm(instance=profile)
         if request.headers.get('Content-Type') == 'application/json' or 'application/json' in request.headers.get('Accept', ''):
@@ -318,7 +340,7 @@ def profile_view(request):
     return render(request, 'accounts/profile.html', context)
 
 
-@csrf_exempt
+@require_http_methods(["GET", "POST"])
 def user_settings_view(request):
     if not request.user.is_authenticated:
         return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=401)
@@ -357,25 +379,30 @@ def user_settings_view(request):
             
             return JsonResponse({'success': False, 'error': 'Invalid action'}, status=400)
         except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+            logger.exception("user_settings_view error")
+            return JsonResponse({'success': False, 'error': 'Server error'}, status=500)
             
     return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
 
 
+
 @login_required
+@require_POST
 def update_language_preference(request):
     """API endpoint to update user language via AJAX from the global navbar"""
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            new_var = data.get('language')
-            if new_var in dict(FarmerProfile.LANGUAGE_CHOICES):
-                profile, _ = FarmerProfile.objects.get_or_create(user=request.user)
-                profile.preferred_language = new_var
-                profile.save()
-                return JsonResponse({'status': 'success'})
-        except Exception as e:
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    try:
+        data = json.loads(request.body)
+        new_var = data.get('language')
+        if new_var in dict(FarmerProfile.LANGUAGE_CHOICES):
+            profile, _ = FarmerProfile.objects.get_or_create(user=request.user)
+            profile.preferred_language = new_var
+            profile.save()
+            return JsonResponse({'status': 'success'})
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400)
+    except Exception:
+        logger.exception("update_language_preference error")
+        return JsonResponse({'status': 'error', 'message': 'Server error'}, status=500)
     return JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=400)
 
 @csrf_exempt
@@ -433,6 +460,7 @@ def forgot_password_view(request):
             
             return JsonResponse({'success': False, 'error': 'Invalid action'}, status=400)
         except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+            logger.exception("forgot_password_view error")
+            return JsonResponse({'success': False, 'error': 'Server error'}, status=500)
             
     return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)

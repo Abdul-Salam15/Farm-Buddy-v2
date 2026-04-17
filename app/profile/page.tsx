@@ -38,6 +38,14 @@ import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, CartesianGrid } fro
 import { useTranslation } from "@/app/i18n/LanguageContext"
 import { API_BASE_URL } from "@/lib/config"
 
+// Helper to get CSRF cookie
+function getCsrfToken(): string {
+  return document.cookie
+    .split('; ')
+    .find(row => row.startsWith('csrftoken='))
+    ?.split('=')[1] ?? ''
+}
+
 // Static fallbacks removed - now managed in component state
 
 const chartConfig = {
@@ -174,7 +182,10 @@ export default function ProfilePage() {
       try {
         await fetch(`${API_BASE_URL}/accounts/update-language/`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCsrfToken()
+          },
           credentials: "include",
           body: JSON.stringify({ language: value }),
         })
@@ -193,6 +204,7 @@ export default function ProfilePage() {
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
+          "X-CSRFToken": getCsrfToken()
         },
         credentials: "include",
         body: JSON.stringify(profileData),
@@ -217,7 +229,10 @@ export default function ProfilePage() {
       await fetch(`${API_BASE_URL}/accounts/logout/`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCsrfToken()
+        },
       })
       window.location.href = "/login"
     } catch (err) {

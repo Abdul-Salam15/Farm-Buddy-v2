@@ -31,7 +31,8 @@ import {
   X,
   Pencil,
   Trash2,
-  Check as SaveIcon
+  Check as SaveIcon,
+  ArrowDown
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
@@ -78,6 +79,7 @@ export default function ChatPage() {
   const [inputValue, setInputValue] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [showScrollButton, setShowScrollButton] = useState(false)
   const { theme, setTheme } = useTheme()
   const [isSpeaking, setIsSpeaking] = useState<string | number | null>(null)
   const [isPaused, setIsPaused] = useState(false)
@@ -105,9 +107,9 @@ export default function ChatPage() {
     { icon: BookOpen, label: t("chat.quick_actions.best_practices") },
   ]
 
-  const scrollToBottom = useCallback((force = false) => {
+  const scrollToBottom = useCallback((force = false, smooth = false) => {
     if (force || isAutoScrollingRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: force ? "smooth" : "auto" })
+      messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "end" })
     }
   }, [])
 
@@ -123,6 +125,7 @@ export default function ChatPage() {
       // If user is within 100px of bottom, enable auto-scroll
       const isAtBottom = scrollHeight - scrollTop - clientHeight < 100
       isAutoScrollingRef.current = isAtBottom
+      setShowScrollButton(!isAtBottom && scrollHeight > clientHeight)
     }
 
     viewport.addEventListener('scroll', handleScroll)
@@ -319,6 +322,9 @@ export default function ChatPage() {
     }
 
     setIsLoading(true)
+    isAutoScrollingRef.current = true
+    setTimeout(() => scrollToBottom(true), 50)
+
     navigator.geolocation.getCurrentPosition(async (position) => {
       try {
         const { latitude, longitude } = position.coords
@@ -409,6 +415,7 @@ export default function ChatPage() {
     setUploadProgress(0)
     setIsLoading(true)
     isAutoScrollingRef.current = true // Force auto-scroll for new user message
+    setTimeout(() => scrollToBottom(true), 50)
 
     try {
       let response;
@@ -794,8 +801,8 @@ export default function ChatPage() {
           </div>
         </header>
 
-        <div className="flex flex-1 flex-col overflow-hidden min-h-0">
-          <ScrollArea className="flex-1" ref={scrollAreaRef}>
+        <div className="flex flex-1 flex-col overflow-hidden min-h-0 relative">
+          <ScrollArea className="flex-1 min-h-0" ref={scrollAreaRef}>
             <div className="mx-auto max-w-3xl px-4 pt-20 pb-8">
               {messages.length === 0 ? (
                 <div className="flex flex-col items-center py-8">
@@ -947,8 +954,24 @@ export default function ChatPage() {
                   )}
                 </div>
               )}
+              <div ref={messagesEndRef} className="h-1 shrink-0" />
             </div>
           </ScrollArea>
+
+          {showScrollButton && (
+            <div className="absolute bottom-[90px] left-0 right-0 flex justify-center z-10 mx-auto max-w-3xl pointer-events-none">
+              <Button
+                size="icon"
+                className="h-10 w-10 rounded-full shadow-md bg-background/80 hover:bg-background border border-border/50 text-foreground pointer-events-auto transition-transform hover:scale-105 active:scale-95"
+                onClick={() => {
+                  isAutoScrollingRef.current = true
+                  scrollToBottom(true, true)
+                }}
+              >
+                <ArrowDown className="h-5 w-5 text-primary" />
+              </Button>
+            </div>
+          )}
 
           {/* Input Area */}
           <div className="shrink-0 border-t border-border bg-card p-4">

@@ -23,6 +23,14 @@ import {
 } from "lucide-react"
 import { useTranslation } from "@/app/i18n/LanguageContext"
 
+// Helper to get CSRF cookie
+function getCsrfToken(): string {
+  return document.cookie
+    .split('; ')
+    .find(row => row.startsWith('csrftoken='))
+    ?.split('=')[1] ?? ''
+}
+
 export default function SettingsPage() {
   const { t, setLanguage } = useTranslation()
   const [settingsData, setSettingsData] = useState({
@@ -81,7 +89,10 @@ export default function SettingsPage() {
       const response = await fetch("http://localhost:8000/accounts/settings/", {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCsrfToken()
+        },
         body: JSON.stringify({
           action: "update_profile",
           ...settingsData
@@ -115,7 +126,10 @@ export default function SettingsPage() {
       const response = await fetch("http://localhost:8000/accounts/settings/", {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCsrfToken()
+        },
         body: JSON.stringify({
           action: "change_password",
           old_password: passwordData.old_password,
@@ -217,7 +231,10 @@ export default function SettingsPage() {
                       try {
                         await fetch("http://localhost:8000/accounts/update-language/", {
                           method: "POST",
-                          headers: { "Content-Type": "application/json" },
+                          headers: { 
+                            "Content-Type": "application/json",
+                            "X-CSRFToken": getCsrfToken()
+                          },
                           credentials: "include",
                           body: JSON.stringify({ language: value }),
                         })

@@ -16,10 +16,10 @@ from chat.models import Conversation, Message
 from utils.gemini_api import ask_gemini, analyze_plant_image, model
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.contrib.auth.hashers import check_password as check_hashed_password
+import logging
 
-# Setup Django environment
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'farmbuddy_web.settings')
-django.setup()
+logger = logging.getLogger(__name__)
 
 # --- DB SYNC HELPERS ---
 # These functions MUST be called using sync_to_async from inside handlers.
@@ -99,15 +99,19 @@ def db_register_user(username, password, full_name, location, language, acres=0,
     user = User.objects.create_user(username=username, password=password, first_name=full_name)
     profile = FarmerProfile.objects.create(
         user=user,
-        full_name=full_name,
+        first_name=full_name,
         location=location,
         preferred_language=language,
         farm_size_acres=acres,
         soil_type=soil,
         top_pests=pests,
-        security_answer=security_answer
     )
+    if security_answer:
+        profile.set_security_answer(security_answer.strip().lower())
     return user, profile
+
+def db_migrate_security_answer(profile, answer):
+    profile.set_security_answer(answer)
 
 def db_get_profile_by_username(username):
     try:
@@ -348,12 +352,13 @@ def get_localized_labels(lang):
             'connect_info': "Lati lo FarmBuddy lori Telegram, o le:\n\n1. Lo bọtini **'Open Telegram'** lori oju opo wẹẹbu 'My Farm'.\n2. **Wọle (Log in)** taara nibi ti o ba ti ni akọọlẹ tẹlẹ.\n3. **Forukọsilẹ (Sign up)** lati ṣẹda akọọlẹ tuntun.",
         }
     }
+    labels['pcm'] = labels['en']
     return labels.get(lang, labels['en'])
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle the /start command for linking accounts."""
     chat_id = update.effective_chat.id
-    print(f"DEBUG: Received /start command from {chat_id}", flush=True)
+    logger.debug("Received /start command from %s", chat_id)
     
     if context.args:
         token = context.args[0]
@@ -433,9 +438,22 @@ async def reset_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     profile = context.user_data.get('reset_profile_obj')
     l = get_localized_labels(profile.preferred_language or 'en')
     
-    if profile.security_answer and answer.strip().lower() == profile.security_answer.strip().lower():
-        await update.message.reply_text(l['prompt_new_password'], parse_mode='Markdown')
-        return R_NEW_PASS
+    if profile.security_answer:
+        stored = profile.security_answer
+        if stored.startswith(('pbkdf2_', 'bcrypt', 'argon2')):
+            answer_matches = check_hashed_password(answer.strip().lower(), stored)
+        else:
+            # Legacy plaintext — compare and migrate
+            answer_matches = (answer.strip().lower() == stored.strip().lower())
+            if answer_matches:
+                await sync_to_async(db_migrate_security_answer)(profile, answer.strip().lower())
+        
+        if answer_matches:
+            await update.message.reply_text(l['prompt_new_password'], parse_mode='Markdown')
+            return R_NEW_PASS
+        else:
+            await update.message.reply_text(l['reset_failed'])
+            return ConversationHandler.END
     else:
         await update.message.reply_text(l['reset_failed'])
         return ConversationHandler.END
@@ -735,7 +753,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle regular text messages using Gemini."""
     chat_id = update.effective_chat.id
     user_text = update.message.text
-    print(f"DEBUG: Received message from {chat_id}: {user_text[:20]}...", flush=True)
+    logger.debug("Received message from %s: %s...", chat_id, user_text[:20])
     
     info = await sync_to_async(db_get_profile_info)(chat_id)
     if info:
@@ -755,7 +773,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # 3. Ask Gemini with profile context
         await update.message.chat.send_action("typing")
-        response_text = ask_gemini(history, profile_context=profile_context, language=lang)
+        response_text = await sync_to_async(ask_gemini)(history, profile_context=profile_context, language=lang)
         
         # 4. Save Assistant reply
         await sync_to_async(db_save_msg)(conv, 'assistant', response_text)
@@ -768,7 +786,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle leaf photo uploads for diagnosis."""
     chat_id = update.effective_chat.id
-    print(f"DEBUG: Received photo from {chat_id}", flush=True)
+    logger.debug("Received photo from %s", chat_id)
     try:
         info = await sync_to_async(db_get_profile_info)(chat_id)
         if info:

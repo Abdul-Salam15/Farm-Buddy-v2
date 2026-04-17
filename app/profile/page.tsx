@@ -37,6 +37,14 @@ import {
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, CartesianGrid } from "recharts"
 import { useTranslation } from "@/app/i18n/LanguageContext"
 
+// Helper to get CSRF cookie
+function getCsrfToken(): string {
+  return document.cookie
+    .split('; ')
+    .find(row => row.startsWith('csrftoken='))
+    ?.split('=')[1] ?? ''
+}
+
 // Static fallbacks removed - now managed in component state
 
 const chartConfig = {
@@ -173,7 +181,10 @@ export default function ProfilePage() {
       try {
         await fetch("http://localhost:8000/accounts/update-language/", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCsrfToken()
+          },
           credentials: "include",
           body: JSON.stringify({ language: value }),
         })
@@ -192,6 +203,7 @@ export default function ProfilePage() {
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
+          "X-CSRFToken": getCsrfToken()
         },
         credentials: "include",
         body: JSON.stringify(profileData),
@@ -216,7 +228,10 @@ export default function ProfilePage() {
       await fetch("http://localhost:8000/accounts/logout/", {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCsrfToken()
+        },
       })
       window.location.href = "/login"
     } catch (err) {

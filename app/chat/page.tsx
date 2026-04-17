@@ -300,14 +300,20 @@ export default function ChatPage() {
     setIsPaused(false)
 
     try {
-      // Use direct URL for streaming instead of fetching blob
-      const url = `${API_BASE}/api/speak/?text=${encodeURIComponent(message.content)}&language=${preferredLanguage}`
-      const audio = new Audio(url)
+      const response = await fetch(
+        `${API_BASE}/api/speak/?text=${encodeURIComponent(message.content)}&language=${preferredLanguage}`,
+        { credentials: 'include' }
+      )
+      if (!response.ok) throw new Error(`TTS request failed: ${response.status}`)
+      const blob = await response.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const audio = new Audio(objectUrl)
       audioRef.current = audio
       audio.onended = () => {
         setIsSpeaking(null)
         setIsPaused(false)
         audioRef.current = null
+        URL.revokeObjectURL(objectUrl)
       }
       audio.play()
     } catch (err) {
@@ -1099,7 +1105,13 @@ export default function ChatPage() {
                 <Button variant="outline" size="icon" className="h-9 w-9 text-muted-foreground">
                   <ImageIcon className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" size="icon" className="h-9 w-9 text-muted-foreground">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className={`h-9 w-9 ${isRecording ? 'text-red-500 border-red-300 bg-red-50' : 'text-muted-foreground'}`}
+                  onClick={handleMicClick}
+                >
+                  <Mic className={`h-4 w-4 ${isRecording ? 'animate-pulse' : ''}`} />
                 </Button>
               </div>
             </div>

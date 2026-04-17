@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from django.views.generic import TemplateView
+from django.views.generic import TemplateView, RedirectView
 from django.http import JsonResponse
 import os
 from django.conf import settings
@@ -33,5 +33,5 @@ urlpatterns = [
     path('accounts/', include('accounts.urls')),
     path('sw.js', TemplateView.as_view(template_name='sw.js', content_type='application/javascript')),
     path('manifest.json', TemplateView.as_view(template_name='manifest.json', content_type='application/json')),
-
+    path('', RedirectView.as_view(url='/chat/', permanent=False)),
 ]

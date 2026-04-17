@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: farmbuddy-api
+    env: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: ./build.sh
+    startCommand: ./start.sh
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com"
+      - key: TELEGRAM_BOT_USERNAME
+        value: myfarmbuddy_bot
+
+      # --- Set these manually in the Render dashboard ---
+      - key: DATABASE_URL
+        sync: false          # Neon PostgreSQL connection string (see deployment guide)
+      - key: FRONTEND_URL
+        sync: false          # Your Vercel frontend URL e.g. https://farm-buddy.vercel.app
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: OPENWEATHER_API_KEY
+        sync: false
+      - key: YARNGPT_API_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# run_bot in background
-python manage.py run_bot &
+# Start Telegram bot in background
+python manage.py run_telegram_bot &
 
-# start web server
-gunicorn farmbuddy_web.wsgi:application --bind 0.0.0.0:$PORT
+# Start web server (single worker — fits Render free tier 512 MB RAM)
+gunicorn farmbuddy_web.wsgi:application --bind 0.0.0.0:$PORT --workers 1

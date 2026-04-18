@@ -499,25 +499,19 @@ def get_weather_data(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def transcribe_audio(request):
-    """Transcribe audio using Gemini"""
+    """Transcribe audio using Gemini inline data (no Files API, no state polling)"""
     try:
-        from utils.gemini_api import analyze_plant_image # Reuse analyzing logic structure
         import google.generativeai as genai
-        
+        import base64
+
         if 'audio' not in request.FILES:
             return JsonResponse({'success': False, 'error': 'No audio provided'}, status=400)
-            
+
         audio_file = request.FILES['audio']
         if audio_file.size > 10 * 1024 * 1024:
             return JsonResponse({'success': False, 'error': 'Audio exceeds 10MB limit.'}, status=400)
-            
-        language = request.POST.get('language', 'en')
 
-        # Use a secure random temp path — never trust the client-supplied filename
-        import uuid, tempfile
-        suffix = '.webm'
-        temp_fd, temp_path = tempfile.mkstemp(suffix=suffix, prefix='farmbuddy_audio_')
-        os.close(temp_fd)
+        language = request.POST.get('language', 'en')
         if language not in ['en', 'ha', 'ig', 'yo']:
             language = 'en'
         
@@ -543,21 +537,23 @@ def transcribe_audio(request):
             result = model.generate_content([myfile, prompt])
             transcription = result.text.strip()
 
-            # Cleanup
-            os.remove(temp_path)
+        # Send audio inline — bypasses Files API async processing entirely.
+        # At ~72KB this is well within Gemini's inline data limit.
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        result = model.generate_content([
+            {
+                'inline_data': {
+                    'mime_type': mime_type,
+                    'data': base64.b64encode(audio_bytes).decode('utf-8'),
+                }
+            },
+            prompt,
+        ])
 
-            return JsonResponse({'success': True, 'text': transcription})
-            
-        except Exception as ignored:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-            raise ignored
+        return JsonResponse({'success': True, 'text': result.text.strip()})
 
     except Exception as e:
-        try:
-            print(f"Streaming Error: {e}")
-        except:
-            pass
+        print(f"Transcription Error: {e}")
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 

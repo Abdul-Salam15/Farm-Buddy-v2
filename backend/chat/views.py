@@ -539,7 +539,7 @@ def transcribe_audio(request):
 
         # Send audio inline — bypasses Files API async processing entirely.
         # At ~72KB this is well within Gemini's inline data limit.
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-flash-latest")
         result = model.generate_content([
             {
                 'inline_data': {

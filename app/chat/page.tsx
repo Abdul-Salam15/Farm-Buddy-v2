@@ -312,17 +312,30 @@ export default function ChatPage() {
     }
   };
 
+  const speakWithBrowser = (text: string) => {
+    if (!window.speechSynthesis) {
+      setIsSpeaking(null)
+      return
+    }
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(text)
+    // Best-effort language mapping for browser TTS voices
+    const langMap: Record<string, string> = { en: 'en-US', ha: 'ha', ig: 'ig', yo: 'yo' }
+    utterance.lang = langMap[preferredLanguage] || 'en-US'
+    utterance.onend = () => { setIsSpeaking(null); setIsPaused(false) }
+    utterance.onerror = () => { setIsSpeaking(null); setIsPaused(false) }
+    window.speechSynthesis.speak(utterance)
+  }
+
   const playMessage = async (message: Message) => {
-    // If currently speaking this message
+    // If currently speaking this message — toggle pause/resume
     if (isSpeaking === message.id) {
       if (audioRef.current) {
-        if (!isPaused) {
-          audioRef.current.pause()
-          setIsPaused(true)
-        } else {
-          audioRef.current.play()
-          setIsPaused(false)
-        }
+        if (!isPaused) { audioRef.current.pause(); setIsPaused(true) }
+        else { audioRef.current.play(); setIsPaused(false) }
+      } else if (window.speechSynthesis) {
+        if (!isPaused) { window.speechSynthesis.pause(); setIsPaused(true) }
+        else { window.speechSynthesis.resume(); setIsPaused(false) }
       }
       return
     }
@@ -352,10 +365,17 @@ export default function ChatPage() {
         audioRef.current = null
         URL.revokeObjectURL(objectUrl)
       }
-      audio.play()
+      try {
+        await audio.play()
+      } catch (playErr) {
+        console.error("audio.play() failed, falling back to SpeechSynthesis", playErr)
+        URL.revokeObjectURL(objectUrl)
+        audioRef.current = null
+        speakWithBrowser(message.content)
+      }
     } catch (err) {
-      console.error("TTS failed", err)
-      setIsSpeaking(null)
+      console.error("TTS API failed, falling back to SpeechSynthesis", err)
+      speakWithBrowser(message.content)
     }
   }
 

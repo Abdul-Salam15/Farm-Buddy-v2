@@ -199,27 +199,33 @@ export default function ChatPage() {
         };
 
         mediaRecorder.onstop = async () => {
+          console.log("Recording stopped, chunks:", audioChunksRef.current.length);
           const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          console.log("Audio blob size:", audioBlob.size);
           const formData = new FormData();
           formData.append('audio', audioBlob, 'recording.webm');
           formData.append('language', preferredLanguage);
 
           setIsLoading(true);
           try {
+            console.log("Sending to transcription API...");
             const res = await fetch(`${API_BASE}/api/transcribe/`, {
               method: 'POST',
               body: formData,
               credentials: 'include'
             });
+            console.log("Transcription response status:", res.status);
             const data = await res.json();
+            console.log("Transcription result:", data);
             if (data.success && data.text) {
-              // Finalize with high-quality backend transcription
               setInputValue(data.text);
             } else if (data.error) {
               console.error("Transcription error:", data.error);
+              alert("Transcription failed: " + data.error);
             }
           } catch (err) {
             console.error("Failed to transcribe audio:", err);
+            alert("Could not send audio for transcription.");
           } finally {
             setIsLoading(false);
             stream.getTracks().forEach(track => track.stop());
@@ -1116,6 +1122,13 @@ export default function ChatPage() {
                   <Send className="h-5 w-5" />
                 </Button>
               </div>
+              {/* Mobile recording indicator */}
+              {isRecording && (
+                <div className="mt-3 flex items-center justify-center gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 sm:hidden">
+                  <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-xs text-red-600 font-medium">Recording... tap mic to stop</span>
+                </div>
+              )}
               {/* Mobile action buttons */}
               <div className="mx-auto mt-3 flex max-w-3xl justify-center gap-2 sm:hidden">
                 <Button variant="outline" size="icon" className="h-9 w-9 text-muted-foreground" onClick={handleWeatherClick}>

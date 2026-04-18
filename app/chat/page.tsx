@@ -216,7 +216,6 @@ export default function ChatPage() {
           formData.append('audio', audioBlob, 'recording.webm');
           formData.append('language', preferredLanguage);
 
-          setIsLoading(true);
           setIsTranscribing(true);
           try {
             console.log("Sending to transcription API...");
@@ -238,7 +237,6 @@ export default function ChatPage() {
             console.error("Failed to transcribe audio:", err);
             alert("Could not send audio for transcription.");
           } finally {
-            setIsLoading(false);
             setIsTranscribing(false);
             stream.getTracks().forEach(track => track.stop());
           }

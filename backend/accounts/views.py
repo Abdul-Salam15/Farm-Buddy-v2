@@ -199,6 +199,7 @@ def logout_view(request):
     return redirect('login')
 
 
+@csrf_exempt
 @login_required
 def profile_view(request):
     profile, _ = FarmerProfile.objects.get_or_create(user=request.user)
@@ -340,6 +341,7 @@ def profile_view(request):
     return render(request, 'accounts/profile.html', context)
 
 
+@csrf_exempt
 @require_http_methods(["GET", "POST"])
 def user_settings_view(request):
     if not request.user.is_authenticated:
@@ -386,6 +388,7 @@ def user_settings_view(request):
 
 
 
+@csrf_exempt
 @login_required
 @require_POST
 def update_language_preference(request):

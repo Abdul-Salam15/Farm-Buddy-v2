@@ -531,22 +531,15 @@ def transcribe_audio(request):
             # Upload to Gemini
             myfile = genai.upload_file(temp_path)
 
-            # Wait for file to be in ACTIVE state (required before use)
+            # Small delay to ensure file is registered
             import time
-            max_wait = 30
-            for _ in range(max_wait):
-                myfile = genai.get_file(myfile.name)
-                if myfile.state == 'ACTIVE':
-                    break
-                time.sleep(1)
-
-            if myfile.state != 'ACTIVE':
-                raise Exception(f"File processing failed. State: {myfile.state}")
+            time.sleep(2)
 
             model = genai.GenerativeModel("gemini-flash-lite-latest")
 
             prompt = f"Transcribe this audio exactly as spoken. The language is likely {language} (Hausa/Igbo/Yoruba/English). Return ONLY the transcription text, no other commentary."
 
+            # Try to generate content; Gemini will wait for file to be ready
             result = model.generate_content([myfile, prompt])
             transcription = result.text.strip()
 

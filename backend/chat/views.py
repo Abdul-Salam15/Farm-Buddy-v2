@@ -221,8 +221,11 @@ def api_conversation_history(request, conversation_id):
         if request.user.is_authenticated:
             conversation = get_object_or_404(Conversation, id=conversation_id, user=request.user)
         else:
+            session_conv_id = request.session.get('conversation_id')
+            if conversation_id != session_conv_id:
+                return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=403)
             conversation = get_object_or_404(Conversation, id=conversation_id, user__isnull=True)
-            
+
         messages = conversation.messages.all().order_by('created_at')
         message_list = []
         for m in messages:

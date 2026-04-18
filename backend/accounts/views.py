@@ -8,6 +8,7 @@ from django.contrib import messages
 from django.views.decorators.http import require_POST
 from .forms import CustomUserCreationForm, FarmerProfileForm, UserSettingsForm
 from .models import FarmerProfile
+from chat.models import Conversation
 import json
 import random
 import os
@@ -199,6 +200,29 @@ def logout_view(request):
     return redirect('login')
 
 
+def _recent_chats(user):
+    """Return the 5 most recent conversations with a short preview for the profile page."""
+    result = []
+    try:
+        convs = Conversation.objects.filter(user=user).order_by('-updated_at')[:5]
+        for conv in convs:
+            last_msg = conv.messages.order_by('-created_at').first()
+            preview = ''
+            if last_msg:
+                preview = last_msg.content[:100]
+                if len(last_msg.content) > 100:
+                    preview += '...'
+            result.append({
+                'id': conv.id,
+                'title': conv.title or 'Chat',
+                'preview': preview,
+                'updated_at': conv.updated_at.isoformat(),
+            })
+    except Exception:
+        pass
+    return result
+
+
 @csrf_exempt
 @login_required
 def profile_view(request):
@@ -254,6 +278,7 @@ def profile_view(request):
                 'livestock_types': profile.livestock_types,
                 'telegram_link_token': profile.get_or_create_link_token(),
                 'daily_tip': get_daily_tip(profile.preferred_language or 'en'),
+                'recent_chats': _recent_chats(request.user),
             }
             return JsonResponse({'success': True, 'profile': data})
 

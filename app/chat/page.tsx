@@ -100,6 +100,7 @@ export default function ChatPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const isAutoScrollingRef = useRef(true)
+  const hasRestoredConvRef = useRef(false)
 
   const quickActions = [
     { icon: Leaf, label: t("chat.quick_actions.crop_disease") },
@@ -456,6 +457,24 @@ export default function ChatPage() {
     fetchConversations()
     fetchUserProfile()
   }, [fetchConversations, fetchUserProfile])
+
+  // Persist current conversation across page refreshes
+  useEffect(() => {
+    if (currentConvId) {
+      localStorage.setItem('farmbuddy_conv_id', String(currentConvId))
+    }
+  }, [currentConvId])
+
+  // Restore last conversation once the list is loaded
+  useEffect(() => {
+    if (hasRestoredConvRef.current || conversations.length === 0) return
+    hasRestoredConvRef.current = true
+    const savedId = localStorage.getItem('farmbuddy_conv_id')
+    const target = savedId
+      ? conversations.find((c) => c.id === Number(savedId))
+      : conversations[0]
+    if (target) loadConversation(target.id)
+  }, [conversations])
 
   const handleSend = async () => {
     if ((!inputValue.trim() && !selectedImage) || isLoading) return

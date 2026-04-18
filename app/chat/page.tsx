@@ -170,6 +170,7 @@ export default function ChatPage() {
   const [isRecording, setIsRecording] = useState(false)
 
   const handleMicClick = async () => {
+    console.log("Mic button clicked, isRecording:", isRecording);
     if (isRecording) {
       // Stop MediaRecorder
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -180,10 +181,13 @@ export default function ChatPage() {
         recognitionRef.current.stop();
       }
       setIsRecording(false);
+      console.log("Recording stopped");
     } else {
       try {
+        console.log("Requesting microphone access...");
         // 1. Setup MediaRecorder for robust backend transcription
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log("Microphone access granted, stream:", stream.active);
         const mediaRecorder = new MediaRecorder(stream);
         mediaRecorderRef.current = mediaRecorder;
         audioChunksRef.current = [];
@@ -225,6 +229,7 @@ export default function ChatPage() {
         // 2. Setup SpeechRecognition for real-time visual feedback
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         if (SpeechRecognition) {
+          console.log("SpeechRecognition available, starting...");
           const recognition = new SpeechRecognition();
           recognitionRef.current = recognition;
 
@@ -252,25 +257,39 @@ export default function ChatPage() {
             }
 
             if (finalTranscript || interimTranscript) {
+              console.log("Speech recognized:", { finalTranscript, interimTranscript });
               setInputValue(finalTranscript + interimTranscript);
             }
           };
 
           recognition.onerror = (event: any) => {
-            // Silently handle network errors, as MediaRecorder is the reliable source
-            if (event.error !== 'network') {
-              console.warn("Speech recognition feedback error:", event.error);
-            }
+            console.warn("Speech recognition error:", event.error);
           };
 
           recognition.start();
+        } else {
+          console.log("SpeechRecognition not available on this browser");
         }
 
         mediaRecorder.start();
         setIsRecording(true);
-      } catch (err) {
-        console.error("Failed to start recording:", err);
-        alert("Failed to start recording. Please check microphone permissions.");
+        console.log("Recording started");
+      } catch (err: any) {
+        console.error("Microphone error:", err);
+        let message = "Failed to start recording.";
+
+        if (err.name === 'NotAllowedError') {
+          message = "Microphone permission denied. Please enable it in browser settings.";
+        } else if (err.name === 'NotFoundError') {
+          message = "No microphone found on this device.";
+        } else if (err.name === 'NotReadableError') {
+          message = "Microphone is already in use by another app.";
+        } else if (err.name === 'SecurityError') {
+          message = "Microphone access blocked. Check browser/site permissions.";
+        }
+
+        console.log("Error details:", { name: err.name, message: err.message });
+        alert(message);
       }
     }
   };

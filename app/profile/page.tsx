@@ -63,6 +63,7 @@ export default function ProfilePage() {
   const { t, setLanguage } = useTranslation()
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [recentChats, setRecentChats] = useState<{ id: number; title: string; preview: string; updated_at: string }[]>([])
   const [profileData, setProfileData] = useState({
     username: "",
     email: "",
@@ -155,6 +156,9 @@ export default function ProfilePage() {
           }
           if (profile.location) {
             fetchWeather(profile.location)
+          }
+          if (profile.recent_chats) {
+            setRecentChats(profile.recent_chats)
           }
         } else {
           router.push("/login")
@@ -684,17 +688,37 @@ export default function ProfilePage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="rounded-xl bg-muted/30 py-8 text-center">
-                  <MessageCircle className="mx-auto h-8 w-8 text-muted-foreground/50" />
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    {t('profile.no_recent')}
-                  </p>
-                  <Link href="/chat">
-                    <Button variant="link" size="sm" className="mt-1">
-                      {t('profile.start_chatting')}
-                    </Button>
-                  </Link>
-                </div>
+                {recentChats.length === 0 ? (
+                  <div className="rounded-xl bg-muted/30 py-8 text-center">
+                    <MessageCircle className="mx-auto h-8 w-8 text-muted-foreground/50" />
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      {t('profile.no_recent')}
+                    </p>
+                    <Link href="/chat">
+                      <Button variant="link" size="sm" className="mt-1">
+                        {t('profile.start_chatting')}
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {recentChats.map((chat) => (
+                      <Link key={chat.id} href="/chat" className="block">
+                        <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 hover:bg-muted/40 transition-colors cursor-pointer">
+                          <p className="text-sm font-medium text-foreground truncate">{chat.title}</p>
+                          {chat.preview && (
+                            <p className="text-xs text-muted-foreground truncate mt-0.5">{chat.preview}</p>
+                          )}
+                        </div>
+                      </Link>
+                    ))}
+                    <Link href="/chat">
+                      <Button variant="link" size="sm" className="px-0 mt-1">
+                        {t('profile.start_chatting')}
+                      </Button>
+                    </Link>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

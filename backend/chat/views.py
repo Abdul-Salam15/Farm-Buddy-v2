@@ -499,65 +499,61 @@ def get_weather_data(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def transcribe_audio(request):
-    """Transcribe audio using Gemini"""
+    """Transcribe audio using Gemini inline data (no Files API, no state polling)"""
     try:
-        from utils.gemini_api import analyze_plant_image # Reuse analyzing logic structure
         import google.generativeai as genai
-        
+        import base64
+
         if 'audio' not in request.FILES:
             return JsonResponse({'success': False, 'error': 'No audio provided'}, status=400)
-            
+
         audio_file = request.FILES['audio']
         if audio_file.size > 10 * 1024 * 1024:
             return JsonResponse({'success': False, 'error': 'Audio exceeds 10MB limit.'}, status=400)
-            
-        language = request.POST.get('language', 'en')
 
-        # Use a secure random temp path — never trust the client-supplied filename
-        import uuid, tempfile
-        suffix = '.webm'
-        temp_fd, temp_path = tempfile.mkstemp(suffix=suffix, prefix='farmbuddy_audio_')
-        os.close(temp_fd)
+        language = request.POST.get('language', 'en')
         if language not in ['en', 'ha', 'ig', 'yo']:
             language = 'en'
-        
-        # Save temp file
-        temp_path = f"temp_{audio_file.name}"
-        with open(temp_path, 'wb+') as destination:
-            for chunk in audio_file.chunks():
-                destination.write(chunk)
-                
-        try:
-            import time
-            # Upload to Gemini
-            myfile = genai.upload_file(temp_path)
 
-            # Small delay to ensure file is registered
-            import time
-            time.sleep(2)
+        # Read audio bytes directly — no temp file, no Files API upload
+        audio_bytes = b''.join(audio_file.chunks())
 
-            model = genai.GenerativeModel("gemini-flash-lite-latest")
-            prompt = f"Transcribe this audio exactly as spoken. The language is likely {language} (Hausa/Igbo/Yoruba/English). Return ONLY the transcription text, no other commentary."
+        # Determine MIME type; Chrome/Android produces webm by default
+        content_type = getattr(audio_file, 'content_type', '') or 'audio/webm'
+        if 'ogg' in content_type:
+            mime_type = 'audio/ogg'
+        elif 'mp4' in content_type:
+            mime_type = 'audio/mp4'
+        elif 'wav' in content_type:
+            mime_type = 'audio/wav'
+        else:
+            mime_type = 'audio/webm'
 
-            # Try to generate content; Gemini will wait for file to be ready
-            result = model.generate_content([myfile, prompt])
-            transcription = result.text.strip()
+        language_names = {'en': 'English', 'ha': 'Hausa', 'ig': 'Igbo', 'yo': 'Yoruba'}
+        lang_name = language_names.get(language, 'English')
+        prompt = (
+            f"Transcribe this audio exactly as spoken. "
+            f"The language is {lang_name}. "
+            "Return ONLY the transcription text, nothing else."
+        )
 
-            # Cleanup
-            os.remove(temp_path)
+        # Send audio inline — bypasses Files API async processing entirely.
+        # At ~72KB this is well within Gemini's inline data limit.
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        result = model.generate_content([
+            {
+                'inline_data': {
+                    'mime_type': mime_type,
+                    'data': base64.b64encode(audio_bytes).decode('utf-8'),
+                }
+            },
+            prompt,
+        ])
 
-            return JsonResponse({'success': True, 'text': transcription})
-            
-        except Exception as ignored:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-            raise ignored
+        return JsonResponse({'success': True, 'text': result.text.strip()})
 
     except Exception as e:
-        try:
-            print(f"Streaming Error: {e}")
-        except:
-            pass
+        print(f"Transcription Error: {e}")
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 

@@ -221,6 +221,10 @@ def api_conversation_history(request, conversation_id):
         if request.user.is_authenticated:
             conversation = get_object_or_404(Conversation, id=conversation_id, user=request.user)
         else:
+            # Anonymous users may only access the conversation tied to their own session
+            session_conv_id = request.session.get('conversation_id')
+            if conversation_id != session_conv_id:
+                return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=403)
             conversation = get_object_or_404(Conversation, id=conversation_id, user__isnull=True)
             
         messages = conversation.messages.all().order_by('created_at')
@@ -514,31 +518,27 @@ def transcribe_audio(request):
         language = request.POST.get('language', 'en')
         if language not in ['en', 'ha', 'ig', 'yo']:
             language = 'en'
-        
-        # Save temp file
-        temp_path = f"temp_{audio_file.name}"
-        with open(temp_path, 'wb+') as destination:
-            for chunk in audio_file.chunks():
-                destination.write(chunk)
-                
-        try:
-            import time
-            # Upload to Gemini
-            myfile = genai.upload_file(temp_path)
 
-            # Small delay to ensure file is registered
-            import time
-            time.sleep(2)
+        audio_bytes = b''.join(audio_file.chunks())
 
-            model = genai.GenerativeModel("gemini-flash-lite-latest")
-            prompt = f"Transcribe this audio exactly as spoken. The language is likely {language} (Hausa/Igbo/Yoruba/English). Return ONLY the transcription text, no other commentary."
+        content_type = getattr(audio_file, 'content_type', '') or 'audio/webm'
+        if 'ogg' in content_type:
+            mime_type = 'audio/ogg'
+        elif 'mp4' in content_type:
+            mime_type = 'audio/mp4'
+        elif 'wav' in content_type:
+            mime_type = 'audio/wav'
+        else:
+            mime_type = 'audio/webm'
 
-            # Try to generate content; Gemini will wait for file to be ready
-            result = model.generate_content([myfile, prompt])
-            transcription = result.text.strip()
+        language_names = {'en': 'English', 'ha': 'Hausa', 'ig': 'Igbo', 'yo': 'Yoruba'}
+        lang_name = language_names.get(language, 'English')
+        prompt = (
+            f"Transcribe this audio exactly as spoken. "
+            f"The language is {lang_name}. "
+            "Return ONLY the transcription text, nothing else."
+        )
 
-        # Send audio inline — bypasses Files API async processing entirely.
-        # At ~72KB this is well within Gemini's inline data limit.
         model = genai.GenerativeModel("gemini-flash-latest")
         result = model.generate_content([
             {

@@ -173,7 +173,13 @@ def login_view(request):
     
             if form.is_valid():
                 user = form.get_user()
+                # Claim any anonymous conversation created before login
+                anon_conv_id = request.session.get('conversation_id')
                 login(request, user)
+                if anon_conv_id:
+                    from chat.models import Conversation as Conv
+                    Conv.objects.filter(id=anon_conv_id, user__isnull=True).update(user=user)
+                    request.session['conversation_id'] = anon_conv_id
                 if request.headers.get('Content-Type') == 'application/json':
                     return JsonResponse({'success': True, 'user': {'username': user.username, 'email': user.email}})
                 messages.success(request, f"Welcome back, {user.username}!")

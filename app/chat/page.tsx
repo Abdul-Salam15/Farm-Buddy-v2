@@ -168,6 +168,7 @@ export default function ChatPage() {
 
   const [weatherData, setWeatherData] = useState<any>(null)
   const [isRecording, setIsRecording] = useState(false)
+  const [isTranscribing, setIsTranscribing] = useState(false)
 
   const handleMicClick = async () => {
     console.log("Mic button clicked, isRecording:", isRecording);
@@ -207,6 +208,7 @@ export default function ChatPage() {
           formData.append('language', preferredLanguage);
 
           setIsLoading(true);
+          setIsTranscribing(true);
           try {
             console.log("Sending to transcription API...");
             const res = await fetch(`${API_BASE}/api/transcribe/`, {
@@ -228,6 +230,7 @@ export default function ChatPage() {
             alert("Could not send audio for transcription.");
           } finally {
             setIsLoading(false);
+            setIsTranscribing(false);
             stream.getTracks().forEach(track => track.stop());
           }
         };
@@ -1109,7 +1112,8 @@ export default function ChatPage() {
                         handleSend()
                       }
                     }}
-                    placeholder={t('chat.input_placeholder_alt')}
+                    placeholder={isTranscribing ? "Transcribing..." : t('chat.input_placeholder_alt')}
+                    disabled={isTranscribing}
                     className="h-12 w-full rounded-xl border-border bg-background pr-4 pl-4 text-foreground placeholder:text-muted-foreground"
                   />
                 </div>
@@ -1122,11 +1126,13 @@ export default function ChatPage() {
                   <Send className="h-5 w-5" />
                 </Button>
               </div>
-              {/* Mobile recording indicator */}
-              {isRecording && (
-                <div className="mt-3 flex items-center justify-center gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 sm:hidden">
-                  <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                  <span className="text-xs text-red-600 font-medium">Recording... tap mic to stop</span>
+              {/* Mobile recording / transcribing indicator */}
+              {(isRecording || isTranscribing) && (
+                <div className={`mt-3 flex items-center justify-center gap-2 rounded-lg px-3 py-2 sm:hidden border ${isTranscribing ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200'}`}>
+                  <span className={`h-2 w-2 rounded-full animate-pulse ${isTranscribing ? 'bg-yellow-500' : 'bg-red-500'}`} />
+                  <span className={`text-xs font-medium ${isTranscribing ? 'text-yellow-700' : 'text-red-600'}`}>
+                    {isTranscribing ? "Transcribing... please wait" : "Recording... tap mic to stop"}
+                  </span>
                 </div>
               )}
               {/* Mobile action buttons */}

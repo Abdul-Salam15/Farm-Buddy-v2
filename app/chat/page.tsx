@@ -202,6 +202,15 @@ export default function ChatPage() {
         mediaRecorder.onstop = async () => {
           console.log("Recording stopped, chunks:", audioChunksRef.current.length);
           const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+
+          // Desktop: SpeechRecognition already handled transcription — skip backend
+          const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+          if (SpeechRecognitionAPI) {
+            stream.getTracks().forEach(track => track.stop());
+            return;
+          }
+
+          // Mobile: no SpeechRecognition — send audio to backend
           console.log("Audio blob size:", audioBlob.size);
           const formData = new FormData();
           formData.append('audio', audioBlob, 'recording.webm');
@@ -1113,7 +1122,6 @@ export default function ChatPage() {
                       }
                     }}
                     placeholder={isTranscribing ? "Transcribing..." : t('chat.input_placeholder_alt')}
-                    disabled={isTranscribing}
                     className="h-12 w-full rounded-xl border-border bg-background pr-4 pl-4 text-foreground placeholder:text-muted-foreground"
                   />
                 </div>

@@ -533,15 +533,15 @@ def transcribe_audio(request):
 
             # Wait for file to be in ACTIVE state (required before use)
             import time
-            max_wait = 30
+            max_wait = 20
             for _ in range(max_wait):
                 myfile = genai.get_file(myfile.name)
-                if myfile.state == 'ACTIVE':
+                if myfile.state.name == 'ACTIVE':
                     break
                 time.sleep(1)
 
-            if myfile.state != 'ACTIVE':
-                raise Exception(f"File processing failed. State: {myfile.state}")
+            if myfile.state.name != 'ACTIVE':
+                raise Exception(f"File processing failed. State: {myfile.state.name}")
 
             model = genai.GenerativeModel("gemini-flash-lite-latest")
 

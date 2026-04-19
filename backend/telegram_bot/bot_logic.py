@@ -1,8 +1,13 @@
 import os
 import tempfile
 import io
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import numpy as np
 import django
+from datetime import datetime
 from asgiref.sync import sync_to_async
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove, BotCommand
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, ConversationHandler, CallbackQueryHandler
@@ -15,6 +20,7 @@ if not django.conf.settings.configured:
 from accounts.models import FarmerProfile
 from chat.models import Conversation, Message
 from utils.gemini_api import ask_gemini, analyze_plant_image, model
+from utils.weather_api import get_forecast_by_city
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import check_password as check_hashed_password
@@ -681,40 +687,152 @@ async def tip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ Account not linked.")
 
-import matplotlib.pyplot as plt
-import io
+def _build_forecast_image(forecast_data, city_name, lang_labels):
+    """Build a styled 5-day forecast chart and return PNG bytes."""
+    # --- Parse OpenWeather 3-hour interval data into daily summaries ---
+    daily = {}
+    for entry in forecast_data.get('list', []):
+        date_str = entry['dt_txt'].split(' ')[0]
+        if date_str not in daily:
+            daily[date_str] = {'temps': [], 'humidity': [], 'rain_prob': []}
+        daily[date_str]['temps'].append(entry['main']['temp'])
+        daily[date_str]['humidity'].append(entry['main']['humidity'])
+        daily[date_str]['rain_prob'].append(entry.get('pop', 0) * 100)  # fraction → %
+
+    sorted_dates = sorted(daily.keys())[:5]
+    if not sorted_dates:
+        raise ValueError("No forecast data available")
+
+    labels   = [datetime.strptime(d, "%Y-%m-%d").strftime("%a\n%d %b") for d in sorted_dates]
+    max_temps = [max(daily[d]['temps'])      for d in sorted_dates]
+    min_temps = [min(daily[d]['temps'])      for d in sorted_dates]
+    avg_hum   = [sum(daily[d]['humidity']) / len(daily[d]['humidity'])   for d in sorted_dates]
+    avg_rain  = [sum(daily[d]['rain_prob']) / len(daily[d]['rain_prob']) for d in sorted_dates]
+
+    x = np.arange(len(labels))
+    bar_w = 0.5
+
+    # --- Figure setup ---
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+    fig.patch.set_facecolor('#0f1923')
+    ax1.set_facecolor('#0f1923')
+
+    # Rain probability bars (background layer)
+    ax2 = ax1.twinx()
+    rain_bars = ax2.bar(x, avg_rain, width=bar_w, color='#3a7bd5',
+                        alpha=0.35, zorder=2, label='Rain chance (%)')
+    ax2.set_ylim(0, 130)
+    ax2.set_ylabel('Rain chance (%)', color='#3a7bd5', fontsize=9, labelpad=8)
+    ax2.tick_params(axis='y', colors='#3a7bd5', labelsize=8)
+    ax2.spines['right'].set_color('#3a7bd5')
+    ax2.spines['right'].set_alpha(0.4)
+    for spine in ['top', 'left', 'bottom']:
+        ax2.spines[spine].set_visible(False)
+
+    # Temperature band (fill between max and min)
+    ax1.fill_between(x, min_temps, max_temps,
+                     color='#FF6B35', alpha=0.18, zorder=3)
+    ax1.plot(x, max_temps, color='#FF6B35', marker='o', linewidth=2.2,
+             markersize=7, markerfacecolor='#FF6B35', markeredgecolor='#fff',
+             markeredgewidth=1.2, zorder=5, label=f"Max temp (°C)")
+    ax1.plot(x, min_temps, color='#FFA07A', marker='o', linewidth=1.6,
+             markersize=6, linestyle='--', markerfacecolor='#FFA07A',
+             markeredgecolor='#fff', markeredgewidth=1, zorder=5, label="Min temp (°C)")
+
+    # Humidity line
+    ax1.plot(x, avg_hum, color='#4ECDC4', marker='s', linewidth=2,
+             markersize=6, markerfacecolor='#4ECDC4', markeredgecolor='#fff',
+             markeredgewidth=1, zorder=5, label="Humidity (%)")
+
+    # Data labels on temperature points
+    for i, (hi, lo) in enumerate(zip(max_temps, min_temps)):
+        ax1.annotate(f"{hi:.0f}°", (x[i], hi), textcoords="offset points",
+                     xytext=(0, 9), ha='center', fontsize=8.5,
+                     color='#FF6B35', fontweight='bold')
+        ax1.annotate(f"{lo:.0f}°", (x[i], lo), textcoords="offset points",
+                     xytext=(0, -14), ha='center', fontsize=8,
+                     color='#FFA07A')
+
+    # Axes styling
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(labels, fontsize=9, color='#c9d1d9')
+    ax1.tick_params(axis='y', colors='#c9d1d9', labelsize=8)
+    ax1.set_ylabel('Temperature & Humidity', color='#c9d1d9', fontsize=9, labelpad=8)
+    ax1.yaxis.set_label_position('left')
+    for spine in ['top', 'right']:
+        ax1.spines[spine].set_visible(False)
+    for spine in ['left', 'bottom']:
+        ax1.spines[spine].set_color('#30363d')
+    ax1.tick_params(axis='x', colors='#c9d1d9', length=0)
+    ax1.grid(axis='y', color='#30363d', linestyle='--', alpha=0.5, zorder=1)
+
+    # Title
+    ax1.set_title(
+        f"🌾 5-Day Forecast  ·  {city_name}",
+        color='#e6edf3', fontsize=13, fontweight='bold', pad=14, loc='left'
+    )
+
+    # Legend
+    handles = [
+        mpatches.Patch(color='#FF6B35', label='Max temp (°C)'),
+        mpatches.Patch(color='#FFA07A', label='Min temp (°C)'),
+        mpatches.Patch(color='#4ECDC4', label='Humidity (%)'),
+        mpatches.Patch(color='#3a7bd5', alpha=0.6, label='Rain chance (%)'),
+    ]
+    ax1.legend(handles=handles, loc='upper right', fontsize=8,
+               facecolor='#161b22', edgecolor='#30363d', labelcolor='#c9d1d9',
+               framealpha=0.85)
+
+    # Footer
+    fig.text(0.99, 0.01, 'Data: OpenWeatherMap', ha='right', va='bottom',
+             fontsize=7, color='#484f58')
+
+    plt.tight_layout(pad=1.5)
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=130, bbox_inches='tight',
+                facecolor=fig.get_facecolor())
+    buf.seek(0)
+    plt.close(fig)
+    return buf
+
 
 async def forecast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Generate and send weather forecast graph."""
+    """Fetch real weather data and send a styled 5-day forecast chart."""
     chat_id = update.effective_chat.id
     try:
         info = await sync_to_async(db_get_profile_info)(chat_id)
-        if info:
-            l = get_localized_labels(info['lang'])
-            # Use mock data for now (matches profile view)
-            days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-            temps = [28, 30, 29, 31, 27, 26, 28]
-            humidity = [65, 60, 70, 55, 75, 72, 68]
-            
-            # Create plot
-            plt.figure(figsize=(8, 5))
-            plt.plot(days, temps, color='#FF6B6B', marker='o', label=l['temp'])
-            plt.plot(days, humidity, color='#4D96FF', marker='s', label=l['humidity'])
-            
-            plt.title(l['forecast_title'])
-            plt.grid(True, linestyle='--', alpha=0.6)
-            plt.legend()
-            
-            # Save to buffer
-            buf = io.BytesIO()
-            plt.savefig(buf, format='png', bbox_inches='tight')
-            buf.seek(0)
-            plt.close()
-            
-            await update.message.reply_photo(photo=buf)
-        else:
-            await update.message.reply_text("❌ Account not linked.")
+        if not info:
+            await update.message.reply_text(
+                "❌ Account not linked. Use /start with your token from the FarmBuddy website."
+            )
+            return
+
+        location = info.get('location', '').strip()
+        if not location:
+            await update.message.reply_text(
+                "📍 No location set on your profile. Update your location on the FarmBuddy website, then try again."
+            )
+            return
+
+        city_name = location.split(',')[0].strip()
+        await update.message.chat.send_action("upload_photo")
+
+        forecast_data = await sync_to_async(get_forecast_by_city)(city_name)
+
+        if 'error' in forecast_data:
+            await update.message.reply_text(
+                f"⚠️ Could not fetch weather for *{city_name}*: {forecast_data['error']}\n\n"
+                "Make sure your profile location matches a real city name.",
+                parse_mode='Markdown'
+            )
+            return
+
+        l = get_localized_labels(info['lang'])
+        buf = await sync_to_async(_build_forecast_image)(forecast_data, city_name, l)
+        await update.message.reply_photo(photo=buf, caption=f"📍 {location}")
+
     except Exception as e:
+        logger.exception("forecast error")
         await update.message.reply_text(f"❌ Error generating forecast: {str(e)}")
 
 async def language_select(update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -383,6 +383,7 @@ def user_settings_view(request):
         return JsonResponse({
             'success': True,
             'user': {
+                'username': request.user.username,
                 'first_name': request.user.first_name,
                 'last_name': request.user.last_name,
                 'email': request.user.email,

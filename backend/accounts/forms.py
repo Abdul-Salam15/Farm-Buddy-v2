@@ -43,6 +43,7 @@ class FarmerProfileForm(forms.ModelForm):
 
 
 class UserSettingsForm(forms.Form):
+    username = forms.CharField(max_length=150, required=True, label="Username")
     first_name = forms.CharField(max_length=150, required=False, label="First Name")
     last_name = forms.CharField(max_length=150, required=False, label="Last Name")
     preferred_language = forms.ChoiceField(choices=FarmerProfile.LANGUAGE_CHOICES, required=True, label="Default Language")
@@ -52,6 +53,7 @@ class UserSettingsForm(forms.Form):
         self.user = kwargs.pop('user', None)
         super(UserSettingsForm, self).__init__(*args, **kwargs)
         if self.user:
+            self.fields['username'].initial = self.user.username
             self.fields['first_name'].initial = self.user.first_name
             self.fields['last_name'].initial = self.user.last_name
             try:
@@ -59,8 +61,18 @@ class UserSettingsForm(forms.Form):
             except FarmerProfile.DoesNotExist:
                 pass
 
+    def clean_username(self):
+        username = self.cleaned_data['username'].strip()
+        qs = User.objects.filter(username__iexact=username)
+        if self.user:
+            qs = qs.exclude(pk=self.user.pk)
+        if qs.exists():
+            raise forms.ValidationError("That username is already taken.")
+        return username
+
     def save(self):
         if self.user:
+            self.user.username = self.cleaned_data['username']
             self.user.first_name = self.cleaned_data['first_name']
             self.user.last_name = self.cleaned_data['last_name']
             self.user.save()

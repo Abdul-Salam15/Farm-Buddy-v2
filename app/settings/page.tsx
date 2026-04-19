@@ -35,6 +35,7 @@ function getCsrfToken(): string {
 export default function SettingsPage() {
   const { t, setLanguage } = useTranslation()
   const [settingsData, setSettingsData] = useState({
+    username: "",
     first_name: "",
     last_name: "",
     preferred_language: "en",
@@ -64,6 +65,7 @@ export default function SettingsPage() {
         const data = await response.json()
         if (data.success) {
           setSettingsData({
+            username: data.user.username || "",
             first_name: data.user.first_name,
             last_name: data.user.last_name,
             preferred_language: data.user.preferred_language
@@ -199,6 +201,16 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleProfileSave} className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="username">{t('settings.username')}</Label>
+                  <Input
+                    id="username"
+                    placeholder={t('settings.username_placeholder')}
+                    value={settingsData.username}
+                    onChange={(e) => setSettingsData({ ...settingsData, username: e.target.value })}
+                  />
+                </div>
+
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="first_name">{t('settings.first_name')}</Label>

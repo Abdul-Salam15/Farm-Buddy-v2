@@ -1,15 +1,16 @@
 import os
-import django
 import tempfile
 import io
 import matplotlib.pyplot as plt
+import django
 from asgiref.sync import sync_to_async
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove, BotCommand
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, ConversationHandler, CallbackQueryHandler
 
-# Setup Django environment
+# Setup Django environment (no-op if already configured, e.g. when called from management command)
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'farmbuddy_web.settings')
-django.setup()
+if not django.conf.settings.configured:
+    django.setup()
 
 from accounts.models import FarmerProfile
 from chat.models import Conversation, Message

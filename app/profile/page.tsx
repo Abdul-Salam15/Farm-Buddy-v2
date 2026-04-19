@@ -82,6 +82,7 @@ export default function ProfilePage() {
     livestock_types: "",
     telegram_link_token: "",
     telegram_bot_link: "",
+    telegram_is_linked: false,
     daily_tip: "Loading tips...",
   })
   const [weatherData, setWeatherData] = useState<any[]>([])
@@ -247,7 +248,11 @@ export default function ProfilePage() {
   }
 
   const handleOpenTelegram = () => {
-    const url = profileData.telegram_bot_link || `https://t.me/myfarmbuddy_bot?start=${profileData.telegram_link_token}`
+    // If already linked, just open the bot directly — no token needed
+    const botBase = "https://t.me/myfarmbuddy_bot"
+    const url = profileData.telegram_is_linked
+      ? botBase
+      : profileData.telegram_bot_link || `${botBase}?start=${profileData.telegram_link_token}`
     window.open(url, '_blank')
   }
 

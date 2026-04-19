@@ -282,6 +282,10 @@ def profile_view(request):
                 'has_livestock': profile.has_livestock,
                 'livestock_types': profile.livestock_types,
                 'telegram_link_token': profile.get_or_create_link_token(),
+                'telegram_bot_link': "https://t.me/{}?start={}".format(
+                    os.getenv("TELEGRAM_BOT_USERNAME", "myfarmbuddy_bot"),
+                    profile.get_or_create_link_token()
+                ),
                 'daily_tip': get_daily_tip(profile.preferred_language or 'en'),
                 'recent_chats': _recent_chats(request.user),
             }
@@ -356,7 +360,7 @@ def profile_view(request):
     # Get or create telegram link token
     profile = request.user.farmerprofile
     link_token = profile.get_or_create_link_token()
-    bot_username = os.getenv("TELEGRAM_BOT_USERNAME", "FarmBuddyAI_Bot")
+    bot_username = os.getenv("TELEGRAM_BOT_USERNAME", "myfarmbuddy_bot")
     telegram_bot_link = f"https://t.me/{bot_username}?start={link_token}"
 
     context = {

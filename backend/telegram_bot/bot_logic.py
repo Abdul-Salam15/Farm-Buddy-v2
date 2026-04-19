@@ -4,7 +4,7 @@ import tempfile
 import io
 import matplotlib.pyplot as plt
 from asgiref.sync import sync_to_async
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove, BotCommand
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, ConversationHandler, CallbackQueryHandler
 
 # Setup Django environment
@@ -980,7 +980,24 @@ def run_bot():
     request = HTTPXRequest(connect_timeout=30.0, read_timeout=30.0)
     
     print("Initializing FarmBuddy Bot...", flush=True)
-    application = ApplicationBuilder().token(token).request(request).build()
+
+    async def post_init(application):
+        await application.bot.set_my_commands([
+            BotCommand("start", "Login or Sign up"),
+            BotCommand("language", "Select Preferred Language"),
+            BotCommand("dashboard", "Farm Summary"),
+            BotCommand("edit_profile", "Interactive Profile Update"),
+            BotCommand("tip", "Daily Tip"),
+            BotCommand("forecast", "Get weather forecast for the next 7 days"),
+            BotCommand("connect", "Link web profile to Telegram"),
+            BotCommand("signup", "Create an account on FarmBuddy"),
+            BotCommand("login", "Login to your FarmBuddy account"),
+            BotCommand("logout", "Exit your FarmBuddy account"),
+            BotCommand("cancel", "Cancel any active process"),
+        ])
+        print("Bot commands registered.", flush=True)
+
+    application = ApplicationBuilder().token(token).request(request).post_init(post_init).build()
 
     async def global_debug(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.effective_chat:

@@ -544,7 +544,7 @@ def transcribe_audio(request):
 
         url = (
             "https://generativelanguage.googleapis.com/v1beta/models/"
-            f"gemini-2.0-flash:generateContent?key={api_key}"
+            f"gemini-flash-latest:generateContent?key={api_key}"
         )
         payload = {
             "contents": [

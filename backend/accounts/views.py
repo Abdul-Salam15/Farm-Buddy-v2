@@ -173,7 +173,6 @@ def login_view(request):
     
             if form.is_valid():
                 user = form.get_user()
-                # Claim any anonymous conversation created before login
                 anon_conv_id = request.session.get('conversation_id')
                 login(request, user)
                 if anon_conv_id:

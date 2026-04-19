@@ -183,7 +183,6 @@ export default function ChatPage() {
       const data = await res.json()
       if (data.success) {
         setPreferredLanguage(data.profile.preferred_language || "en")
-        // Clear saved conv ID if a different user is now logged in
         const username = data.profile.username
         const storedUser = localStorage.getItem('farmbuddy_user')
         if (storedUser && storedUser !== username) {
@@ -512,7 +511,6 @@ export default function ChatPage() {
     if (hasRestoredConvRef.current || conversations.length === 0) return
     hasRestoredConvRef.current = true
     const savedId = localStorage.getItem('farmbuddy_conv_id')
-    // Fall back to most recent if saved ID not found (e.g. deleted or different user)
     const target = savedId
       ? (conversations.find((c) => c.id === Number(savedId)) ?? conversations[0])
       : conversations[0]

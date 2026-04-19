@@ -81,6 +81,7 @@ export default function ProfilePage() {
     has_livestock: false,
     livestock_types: "",
     telegram_link_token: "",
+    telegram_bot_link: "",
     daily_tip: "Loading tips...",
   })
   const [weatherData, setWeatherData] = useState<any[]>([])
@@ -246,13 +247,8 @@ export default function ProfilePage() {
   }
 
   const handleOpenTelegram = () => {
-    const botUsername = "FarmBuddyAI_Bot" // This should ideally come from env/config
-    const token = profileData.telegram_link_token
-    if (token) {
-      window.open(`https://t.me/${botUsername}?start=${token}`, '_blank')
-    } else {
-      alert(t('profile.alert_no_token'))
-    }
+    const url = profileData.telegram_bot_link || `https://t.me/myfarmbuddy_bot?start=${profileData.telegram_link_token}`
+    window.open(url, '_blank')
   }
 
   if (isLoading) {

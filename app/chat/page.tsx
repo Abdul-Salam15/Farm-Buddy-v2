@@ -99,6 +99,8 @@ export default function ChatPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const speechResultRef = useRef('')
+  const audioContextRef = useRef<AudioContext | null>(null)
   const isAutoScrollingRef = useRef(true)
   const hasRestoredConvRef = useRef(false)
 
@@ -137,6 +139,26 @@ export default function ChatPage() {
   useEffect(() => {
     scrollToBottom()
   }, [messages, scrollToBottom])
+
+  // Unlock Web Audio / HTML5 Audio on iOS PWA on first user interaction
+  useEffect(() => {
+    const unlock = () => {
+      const AC = window.AudioContext || (window as any).webkitAudioContext
+      if (!AC) return
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AC()
+      }
+      if (audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume()
+      }
+    }
+    document.addEventListener('click', unlock, { once: true })
+    document.addEventListener('touchend', unlock, { once: true })
+    return () => {
+      document.removeEventListener('click', unlock)
+      document.removeEventListener('touchend', unlock)
+    }
+  }, [])
 
   const API_BASE = `${API_BASE_URL}/chat`
 
@@ -196,9 +218,16 @@ export default function ChatPage() {
         // 1. Setup MediaRecorder for robust backend transcription
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         console.log("Microphone access granted, stream:", stream.active);
-        const mediaRecorder = new MediaRecorder(stream);
+
+        // Detect best supported MIME type for this platform (iOS needs mp4, Chrome prefers webm)
+        const preferredTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
+        const supportedMime = preferredTypes.find(t => MediaRecorder.isTypeSupported(t)) ?? '';
+        const mediaRecorder = supportedMime
+          ? new MediaRecorder(stream, { mimeType: supportedMime })
+          : new MediaRecorder(stream);
         mediaRecorderRef.current = mediaRecorder;
         audioChunksRef.current = [];
+        speechResultRef.current = '';
 
         mediaRecorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
@@ -208,19 +237,25 @@ export default function ChatPage() {
 
         mediaRecorder.onstop = async () => {
           console.log("Recording stopped, chunks:", audioChunksRef.current.length);
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          // Use the actual recorded MIME type (critical for iOS which uses audio/mp4)
+          const actualMimeType = mediaRecorder.mimeType || 'audio/webm';
+          const audioBlob = new Blob(audioChunksRef.current, { type: actualMimeType });
+          stream.getTracks().forEach(track => track.stop());
 
-          // Desktop: SpeechRecognition already handled transcription — skip backend
-          const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-          if (SpeechRecognitionAPI) {
-            stream.getTracks().forEach(track => track.stop());
+          // If SpeechRecognition produced a final transcript, use it and skip backend
+          if (speechResultRef.current.trim()) {
+            console.log("Using SpeechRecognition result:", speechResultRef.current);
+            speechResultRef.current = '';
             return;
           }
+          speechResultRef.current = '';
 
-          // Mobile: no SpeechRecognition — send audio to backend
-          console.log("Audio blob size:", audioBlob.size);
+          // No speech recognition result — send audio blob to backend for transcription
+          console.log("Audio blob size:", audioBlob.size, "type:", actualMimeType);
+          const ext = actualMimeType.includes('mp4') ? 'recording.mp4'
+            : actualMimeType.includes('ogg') ? 'recording.ogg' : 'recording.webm';
           const formData = new FormData();
-          formData.append('audio', audioBlob, 'recording.webm');
+          formData.append('audio', audioBlob, ext);
           formData.append('language', preferredLanguage);
 
           setIsTranscribing(true);
@@ -245,11 +280,10 @@ export default function ChatPage() {
             alert("Could not send audio for transcription.");
           } finally {
             setIsTranscribing(false);
-            stream.getTracks().forEach(track => track.stop());
           }
         };
 
-        // 2. Setup SpeechRecognition for real-time visual feedback
+        // 2. Setup SpeechRecognition for real-time visual feedback (best-effort)
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         if (SpeechRecognition) {
           console.log("SpeechRecognition available, starting...");
@@ -268,20 +302,21 @@ export default function ChatPage() {
           recognition.interimResults = true;
 
           recognition.onresult = (event: any) => {
-            let interimTranscript = '';
-            let finalTranscript = '';
-
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
+            // Accumulate ALL final results from index 0 (not just from event.resultIndex)
+            // so long multi-segment phrases aren't truncated
+            let allFinal = '';
+            let interim = '';
+            for (let i = 0; i < event.results.length; i++) {
               if (event.results[i].isFinal) {
-                finalTranscript += event.results[i][0].transcript;
+                allFinal += event.results[i][0].transcript;
               } else {
-                interimTranscript += event.results[i][0].transcript;
+                interim += event.results[i][0].transcript;
               }
             }
-
-            if (finalTranscript || interimTranscript) {
-              console.log("Speech recognized:", { finalTranscript, interimTranscript });
-              setInputValue(finalTranscript + interimTranscript);
+            speechResultRef.current = allFinal;
+            if (allFinal || interim) {
+              console.log("Speech recognized:", { finalTranscript: allFinal, interimTranscript: interim });
+              setInputValue(allFinal + interim);
             }
           };
 

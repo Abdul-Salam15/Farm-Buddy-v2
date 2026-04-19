@@ -212,6 +212,33 @@
     "watering_method": "Ụdị ịgba mmiri ihe ọkụkụ",
     "keep_animals": "Ị na-azụ anụmanụ?",
     "what_kinds": "Kedu ụdị?",
-    "back": "Azụ"
+    "back": "Azụ",
+    "forgot_password": "Ị chefuru okwuntughe gị?"
+  },
+  "forgot_password": {
+    "title": "Tọgharịa okwuntughe gị",
+    "username_subtitle": "Tinye aha njirimara gị iji chọta akaụntụ gị",
+    "answer_subtitle": "Zaa ajụjụ nchekwa gị ma họrọ okwuntughe ọhụrụ",
+    "success_title": "A tọgharịrị okwuntughe",
+    "success_message": "Agbanweela okwuntughe gị. Na-eduga gị na nbanye...",
+    "brand_title": "Weghachi akaụntụ gị",
+    "brand_description": "Anyị ga-eji ajụjụ nchekwa i debere mgbe ndebanye aha nyochaa na ọ bụ gị n'ezie.",
+    "security_hint_title": "Ajụjụ nchekwa",
+    "security_hint_desc": "Aza gị adịghị amata akwụkwọ mkpịsị. Naanị gị kwesịrị ịmara ya.",
+    "security_question_label": "Ajụjụ nchekwa gị",
+    "security_answer_label": "Azịza",
+    "security_answer_placeholder": "Tinye azịza gị",
+    "new_password_label": "Okwuntughe ọhụrụ",
+    "new_password_placeholder": "Opekata mpe mkpụrụedemede 8",
+    "confirm_password_label": "Kwenye okwuntughe ọhụrụ",
+    "confirm_password_placeholder": "Tinye okwuntughe ọhụrụ gị ọzọ",
+    "continue_button": "Gaa n'ihu",
+    "reset_button": "Tọgharịa okwuntughe",
+    "back_button": "Gbanwee aha njirimara",
+    "go_to_login": "Gaa na nbanye",
+    "error_no_question": "Akaụntụ a enweghị ajụjụ nchekwa. Biko kpọtụrụ nkwado.",
+    "error_weak_password": "Okwuntughe ga-abụrịrị opekata mpe mkpụrụedemede 8.",
+    "error_password_mismatch": "Okwuntughe adabaghị.",
+    "error_generic": "Ihe mere. Biko nwaa ọzọ."
   }
 }

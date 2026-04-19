@@ -212,6 +212,33 @@
     "watering_method": "Hanyar ban ruwa",
     "keep_animals": "Shin kana kiwon dabbobi?",
     "what_kinds": "Wadanne iri?",
-    "back": "Baya"
+    "back": "Baya",
+    "forgot_password": "Ka manta da kalmar sirri?"
+  },
+  "forgot_password": {
+    "title": "Sake saita kalmar sirri",
+    "username_subtitle": "Shigar da sunan mai amfani don gano akauntinka",
+    "answer_subtitle": "Amsa tambayar tsaro sannan zaɓi sabuwar kalmar sirri",
+    "success_title": "An sake kalmar sirri",
+    "success_message": "An canza kalmar sirrinka. Ana kai ka zuwa shiga...",
+    "brand_title": "Maido da akauntinka",
+    "brand_description": "Za mu yi amfani da tambayar tsaro da ka saita lokacin rajista don tabbatar da kai.",
+    "security_hint_title": "Tambayar tsaro",
+    "security_hint_desc": "Amsarka ba ta da bambanci tsakanin manya da ƙanana. Kai kaɗai ya kamata ka san ta.",
+    "security_question_label": "Tambayar tsaronka",
+    "security_answer_label": "Amsa",
+    "security_answer_placeholder": "Shigar da amsa",
+    "new_password_label": "Sabuwar kalmar sirri",
+    "new_password_placeholder": "Aƙalla haruffa 8",
+    "confirm_password_label": "Tabbatar da sabuwar kalmar sirri",
+    "confirm_password_placeholder": "Sake shigar da sabuwar kalmar sirri",
+    "continue_button": "Ci gaba",
+    "reset_button": "Sake saita kalmar sirri",
+    "back_button": "Canja suna",
+    "go_to_login": "Je zuwa shiga",
+    "error_no_question": "Wannan akaunti ba ta da tambayar tsaro. Da fatan za ka tuntuɓi tallafi.",
+    "error_weak_password": "Kalmar sirri dole ta kasance aƙalla haruffa 8.",
+    "error_password_mismatch": "Kalmar sirri ba ta dace ba.",
+    "error_generic": "Wani abu ya faru. Da fatan sake gwadawa."
   }
 }

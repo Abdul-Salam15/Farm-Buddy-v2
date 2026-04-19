@@ -211,6 +211,33 @@
     "watering_method": "Ọ̀nà ìbomirin irúgbìn",
     "keep_animals": "Ǹjẹ́ o ń sin ẹran?",
     "what_kinds": "Irúfẹ́ wo?",
-    "back": "Padà"
+    "back": "Padà",
+    "forgot_password": "Ṣé o gbàgbé ọ̀rọ̀ ìgbàwọlé rẹ?"
+  },
+  "forgot_password": {
+    "title": "Tún ọ̀rọ̀ ìgbàwọlé rẹ ṣe",
+    "username_subtitle": "Tẹ orúkọ oníṣe rẹ láti wá akauntì rẹ",
+    "answer_subtitle": "Dá ìbéèrè ààbò rẹ lóhùn kí o sì yan ọ̀rọ̀ ìgbàwọlé tuntun",
+    "success_title": "A ti tún ọ̀rọ̀ ìgbàwọlé ṣe",
+    "success_message": "A ti yí ọ̀rọ̀ ìgbàwọlé rẹ padà. À ń mú ọ lọ sí ibi ìwọlé...",
+    "brand_title": "Gba akauntì rẹ padà",
+    "brand_description": "A ó lo ìbéèrè ààbò tí o fi sípò nígbà ìforúkọsílẹ̀ láti ri pé ìwọ náà ni.",
+    "security_hint_title": "Ìbéèrè ààbò",
+    "security_hint_desc": "Ìdáhùn rẹ kò ní ìyàtọ̀ láàrin lẹ́tà ńlá àti kékeré. Ìwọ nìkan ni ó yẹ kí ó mọ̀.",
+    "security_question_label": "Ìbéèrè ààbò rẹ",
+    "security_answer_label": "Ìdáhùn",
+    "security_answer_placeholder": "Tẹ ìdáhùn rẹ",
+    "new_password_label": "Ọ̀rọ̀ ìgbàwọlé tuntun",
+    "new_password_placeholder": "Ó kéréjù lẹ́tà 8",
+    "confirm_password_label": "Fi ọ̀rọ̀ ìgbàwọlé tuntun rẹ múlẹ̀",
+    "confirm_password_placeholder": "Tún ọ̀rọ̀ ìgbàwọlé tuntun rẹ tẹ",
+    "continue_button": "Tẹ̀síwájú",
+    "reset_button": "Tún ọ̀rọ̀ ìgbàwọlé ṣe",
+    "back_button": "Yí orúkọ oníṣe padà",
+    "go_to_login": "Lọ sí ibi ìwọlé",
+    "error_no_question": "Akauntì yí kò ní ìbéèrè ààbò. Jọ̀wọ́ kàn sí ẹgbẹ́ àtìlẹ́yìn.",
+    "error_weak_password": "Ọ̀rọ̀ ìgbàwọlé gbọ́dọ̀ jẹ́ lẹ́tà 8 tàbí jù.",
+    "error_password_mismatch": "Àwọn ọ̀rọ̀ ìgbàwọlé kò bára mu.",
+    "error_generic": "Ìṣòro kan wà. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
   }
 }

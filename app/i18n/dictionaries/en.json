@@ -212,6 +212,33 @@
     "watering_method": "Crop watering method",
     "keep_animals": "Keep animals?",
     "what_kinds": "What kinds?",
-    "back": "Back"
+    "back": "Back",
+    "forgot_password": "Forgot your password?"
+  },
+  "forgot_password": {
+    "title": "Reset your password",
+    "username_subtitle": "Enter your username to find your account",
+    "answer_subtitle": "Answer your security question and choose a new password",
+    "success_title": "Password reset",
+    "success_message": "Your password has been changed. Redirecting to sign in...",
+    "brand_title": "Recover your account",
+    "brand_description": "We'll use the security question you set up during registration to verify it's really you.",
+    "security_hint_title": "Security question",
+    "security_hint_desc": "Your answer is case-insensitive. Only you should know it.",
+    "security_question_label": "Your security question",
+    "security_answer_label": "Answer",
+    "security_answer_placeholder": "Enter your answer",
+    "new_password_label": "New password",
+    "new_password_placeholder": "At least 8 characters",
+    "confirm_password_label": "Confirm new password",
+    "confirm_password_placeholder": "Re-enter your new password",
+    "continue_button": "Continue",
+    "reset_button": "Reset password",
+    "back_button": "Change username",
+    "go_to_login": "Go to sign in",
+    "error_no_question": "This account does not have a security question set. Please contact support.",
+    "error_weak_password": "Password must be at least 8 characters.",
+    "error_password_mismatch": "Passwords do not match.",
+    "error_generic": "Something went wrong. Please try again."
   }
 }

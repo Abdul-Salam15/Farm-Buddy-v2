@@ -503,10 +503,10 @@ def get_weather_data(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def transcribe_audio(request):
-    """Transcribe audio using Gemini inline data (no Files API, no state polling)"""
+    """Transcribe audio via Gemini REST API directly — bypasses SDK Files API auto-upload."""
     try:
-        import google.generativeai as genai
         import base64
+        import requests as http_requests
 
         if 'audio' not in request.FILES:
             return JsonResponse({'success': False, 'error': 'No audio provided'}, status=400)
@@ -539,18 +539,37 @@ def transcribe_audio(request):
             "Return ONLY the transcription text, nothing else."
         )
 
-        model = genai.GenerativeModel("gemini-flash-latest")
-        result = model.generate_content([
-            {
-                'inline_data': {
-                    'mime_type': mime_type,
-                    'data': base64.b64encode(audio_bytes).decode('utf-8'),
-                }
-            },
-            prompt,
-        ])
+        api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            return JsonResponse({'success': False, 'error': 'Gemini API key not configured.'}, status=500)
 
-        return JsonResponse({'success': True, 'text': result.text.strip()})
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            f"gemini-2.0-flash:generateContent?key={api_key}"
+        )
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {
+                            "inline_data": {
+                                "mime_type": mime_type,
+                                "data": base64.b64encode(audio_bytes).decode("utf-8"),
+                            }
+                        },
+                        {"text": prompt},
+                    ]
+                }
+            ]
+        }
+
+        resp = http_requests.post(url, json=payload, timeout=30)
+        if resp.status_code != 200:
+            raise Exception(f"{resp.status_code} {resp.text}")
+
+        data = resp.json()
+        text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        return JsonResponse({'success': True, 'text': text})
 
     except Exception as e:
         print(f"Transcription Error: {e}")

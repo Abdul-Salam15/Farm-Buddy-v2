@@ -281,6 +281,7 @@ def profile_view(request):
                 'top_pests': profile.top_pests,
                 'has_livestock': profile.has_livestock,
                 'livestock_types': profile.livestock_types,
+                'telegram_is_linked': bool(profile.telegram_chat_id),
                 'telegram_link_token': profile.get_or_create_link_token(),
                 'telegram_bot_link': "https://t.me/{}?start={}".format(
                     os.getenv("TELEGRAM_BOT_USERNAME", "myfarmbuddy_bot"),

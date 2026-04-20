@@ -502,73 +502,86 @@ def get_weather_data(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def transcribe_audio(request):
-    """Transcribe audio via Gemini REST API directly — bypasses SDK Files API auto-upload."""
-    try:
-        import base64
-        import requests as http_requests
+    """Transcribe audio using Gemini Files API with ACTIVE-state polling for reliability."""
+    import tempfile
+    import time
+    import google.generativeai as genai
 
+    try:
         if 'audio' not in request.FILES:
             return JsonResponse({'success': False, 'error': 'No audio provided'}, status=400)
 
-        audio_file = request.FILES['audio']
-        if audio_file.size > 10 * 1024 * 1024:
+        audio_file_obj = request.FILES['audio']
+        if audio_file_obj.size > 10 * 1024 * 1024:
             return JsonResponse({'success': False, 'error': 'Audio exceeds 10MB limit.'}, status=400)
 
         language = request.POST.get('language', 'en')
         if language not in ['en', 'ha', 'ig', 'yo']:
             language = 'en'
 
-        audio_bytes = b''.join(audio_file.chunks())
-
-        content_type = getattr(audio_file, 'content_type', '') or 'audio/webm'
-        if 'ogg' in content_type:
-            mime_type = 'audio/ogg'
-        elif 'mp4' in content_type:
-            mime_type = 'audio/mp4'
-        elif 'wav' in content_type:
-            mime_type = 'audio/wav'
-        else:
-            mime_type = 'audio/webm'
-
-        language_names = {'en': 'English', 'ha': 'Hausa', 'ig': 'Igbo', 'yo': 'Yoruba'}
-        lang_name = language_names.get(language, 'English')
-        prompt = (
-            f"Transcribe this audio exactly as spoken. "
-            f"The language is {lang_name}. "
-            "Return ONLY the transcription text, nothing else."
-        )
-
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         if not api_key:
             return JsonResponse({'success': False, 'error': 'Gemini API key not configured.'}, status=500)
 
-        url = (
-            "https://generativelanguage.googleapis.com/v1beta/models/"
-            f"gemini-flash-latest:generateContent?key={api_key}"
-        )
-        payload = {
-            "contents": [
-                {
-                    "parts": [
-                        {
-                            "inline_data": {
-                                "mime_type": mime_type,
-                                "data": base64.b64encode(audio_bytes).decode("utf-8"),
-                            }
-                        },
-                        {"text": prompt},
-                    ]
-                }
-            ]
-        }
+        genai.configure(api_key=api_key)
 
-        resp = http_requests.post(url, json=payload, timeout=30)
-        if resp.status_code != 200:
-            raise Exception(f"{resp.status_code} {resp.text}")
+        content_type = getattr(audio_file_obj, 'content_type', '') or 'audio/webm'
+        if 'ogg' in content_type:
+            ext, mime_type = '.ogg', 'audio/ogg'
+        elif 'mp4' in content_type:
+            ext, mime_type = '.mp4', 'audio/mp4'
+        elif 'wav' in content_type:
+            ext, mime_type = '.wav', 'audio/wav'
+        else:
+            ext, mime_type = '.webm', 'audio/webm'
 
-        data = resp.json()
-        text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-        return JsonResponse({'success': True, 'text': text})
+        audio_bytes = b''.join(audio_file_obj.chunks())
+
+        tmp_path = None
+        uploaded = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+                tmp.write(audio_bytes)
+                tmp_path = tmp.name
+
+            # Upload to Gemini Files API
+            uploaded = genai.upload_file(path=tmp_path, mime_type=mime_type)
+
+            # Poll until ACTIVE — Gemini processes files asynchronously
+            max_wait = 30
+            waited = 0
+            while uploaded.state.name == "PROCESSING" and waited < max_wait:
+                time.sleep(1)
+                waited += 1
+                uploaded = genai.get_file(uploaded.name)
+
+            if uploaded.state.name != "ACTIVE":
+                raise Exception(f"File upload did not become ACTIVE (state: {uploaded.state.name})")
+
+            language_names = {'en': 'English', 'ha': 'Hausa', 'ig': 'Igbo', 'yo': 'Yoruba'}
+            lang_name = language_names.get(language, 'English')
+            prompt = (
+                f"Transcribe this audio exactly as spoken. "
+                f"The language is {lang_name}. "
+                "Return ONLY the transcription text, nothing else."
+            )
+
+            model = genai.GenerativeModel("gemini-2.0-flash")
+            response = model.generate_content([uploaded, prompt])
+            text = response.text.strip()
+            return JsonResponse({'success': True, 'text': text})
+
+        finally:
+            if tmp_path:
+                try:
+                    os.unlink(tmp_path)
+                except Exception:
+                    pass
+            if uploaded:
+                try:
+                    genai.delete_file(uploaded.name)
+                except Exception:
+                    pass
 
     except Exception as e:
         print(f"Transcription Error: {e}")

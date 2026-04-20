@@ -11,13 +11,13 @@ class FarmerProfileInline(admin.StackedInline):
     verbose_name_plural = "Farmer Profile"
     fk_name = "user"
     fields = (
-        ("preferred_language",),
+        "preferred_language",
         ("first_name", "last_name"),
         ("phone_number", "location"),
         ("farm_size_acres", "soil_type"),
         ("ph_level", "water_source"),
         ("current_crops", "past_crops"),
-        ("top_pests",),
+        "top_pests",
         ("has_livestock", "livestock_types"),
         ("telegram_chat_id", "telegram_link_token"),
     )
@@ -84,6 +84,7 @@ class FarmerProfileAdmin(admin.ModelAdmin):
         "last_name", "location", "current_crops",
     )
     readonly_fields = ("created_at", "updated_at", "telegram_link_token")
+    list_select_related = ("user",)
     fieldsets = (
         ("Account", {
             "fields": ("user",)
@@ -114,7 +115,6 @@ class FarmerProfileAdmin(admin.ModelAdmin):
         }),
     )
     ordering = ("-created_at",)
-    date_hierarchy = "created_at"
 
     def get_full_name(self, obj):
         return f"{obj.first_name or ''} {obj.last_name or ''}".strip() or "—"

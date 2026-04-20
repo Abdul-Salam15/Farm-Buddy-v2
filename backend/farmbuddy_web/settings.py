@@ -69,6 +69,7 @@ if FRONTEND_URL not in CSRF_TRUSTED_ORIGINS:
 # Application definition
 
 INSTALLED_APPS = [
+    'jazzmin',                          # must be before django.contrib.admin
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -76,10 +77,90 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
-    'accounts',  # added for user profiles & auth
-    'chat',  # Our chat app
+    'accounts',
+    'chat',
     'telegram_bot',
 ]
+
+# ── FarmBuddy Admin Dashboard (Jazzmin) ──────────────────────────────────────
+JAZZMIN_SETTINGS = {
+    "site_title": "FarmBuddy Admin",
+    "site_header": "FarmBuddy",
+    "site_brand": "FarmBuddy",
+    "site_logo": None,
+    "site_icon": None,
+    "welcome_sign": "Welcome to the FarmBuddy Admin Dashboard",
+    "copyright": "FarmBuddy",
+    "search_model": ["auth.User", "accounts.FarmerProfile", "chat.Conversation"],
+    "user_avatar": None,
+    "topmenu_links": [
+        {"name": "Dashboard", "url": "admin:index", "permissions": ["auth.view_user"]},
+        {"name": "View Site", "url": "/chat/", "new_window": True},
+    ],
+    "usermenu_links": [
+        {"name": "View Site", "url": "/chat/", "new_window": True},
+    ],
+    "show_sidebar": True,
+    "navigation_expanded": True,
+    "hide_apps": [],
+    "hide_models": [],
+    "order_with_respect_to": ["auth", "accounts", "chat"],
+    "icons": {
+        "auth":                     "fas fa-users-cog",
+        "auth.user":                "fas fa-user",
+        "auth.group":               "fas fa-users",
+        "accounts.farmerprofile":   "fas fa-seedling",
+        "chat.conversation":        "fas fa-comments",
+        "chat.message":             "fas fa-comment-alt",
+    },
+    "default_icon_parents": "fas fa-chevron-circle-right",
+    "default_icon_children": "fas fa-circle",
+    "related_modal_active": True,
+    "custom_css": None,
+    "custom_js": None,
+    "use_google_fonts_cdn": True,
+    "show_ui_builder": False,
+    "changeform_format": "horizontal_tabs",
+    "changeform_format_overrides": {
+        "auth.user": "collapsible",
+        "auth.group": "vertical_tabs",
+    },
+    "language_chooser": False,
+}
+
+JAZZMIN_UI_TWEAKS = {
+    "navbar_small_text": False,
+    "footer_small_text": False,
+    "body_small_text": False,
+    "brand_small_text": False,
+    "brand_colour": "navbar-success",
+    "accent": "accent-success",
+    "navbar": "navbar-dark",
+    "no_navbar_border": False,
+    "navbar_fixed": True,
+    "layout_boxed": False,
+    "footer_fixed": False,
+    "sidebar_fixed": True,
+    "sidebar": "sidebar-dark-success",
+    "sidebar_nav_small_text": False,
+    "sidebar_disable_expand": False,
+    "sidebar_nav_child_indent": True,
+    "sidebar_nav_compact_style": True,
+    "sidebar_nav_legacy_style": False,
+    "sidebar_nav_flat_style": False,
+    "theme": "darkly",
+    "dark_mode_theme": "darkly",
+    "button_classes": {
+        "primary":   "btn-success",
+        "secondary": "btn-secondary",
+        "info":      "btn-outline-info",
+        "warning":   "btn-warning",
+        "danger":    "btn-danger",
+        "muted":     "btn-secondary",
+    },
+    "actions_sticky_top": True,
+}
+# ─────────────────────────────────────────────────────────────────────────────
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

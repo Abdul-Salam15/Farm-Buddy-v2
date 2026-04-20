@@ -688,108 +688,139 @@ async def tip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Account not linked.")
 
 def _build_forecast_image(forecast_data, city_name, lang_labels):
-    """Build a styled 5-day forecast chart and return PNG bytes."""
-    # --- Parse OpenWeather 3-hour interval data into daily summaries ---
+    """Build a two-panel forecast chart: temperature top, humidity+rain bottom."""
+    BG      = '#0d1117'
+    PANEL   = '#161b22'
+    BORDER  = '#30363d'
+    TEXT    = '#e6edf3'
+    SUBTEXT = '#8b949e'
+
+    C_TEMP  = '#f97316'   # orange  – avg temperature line
+    C_HIGH  = '#fbbf24'   # amber   – daily high tick marks
+    C_LOW   = '#60a5fa'   # blue    – daily low tick marks
+    C_HUM   = '#34d399'   # emerald – humidity bars
+    C_RAIN  = '#818cf8'   # indigo  – rain probability bars
+
+    # --- Parse 3-hour intervals into daily summaries ---
     daily = {}
     for entry in forecast_data.get('list', []):
-        date_str = entry['dt_txt'].split(' ')[0]
-        if date_str not in daily:
-            daily[date_str] = {'temps': [], 'humidity': [], 'rain_prob': []}
-        daily[date_str]['temps'].append(entry['main']['temp'])
-        daily[date_str]['humidity'].append(entry['main']['humidity'])
-        daily[date_str]['rain_prob'].append(entry.get('pop', 0) * 100)  # fraction → %
+        d = entry['dt_txt'].split(' ')[0]
+        if d not in daily:
+            daily[d] = {'temps': [], 'hum': [], 'rain': []}
+        daily[d]['temps'].append(entry['main']['temp'])
+        daily[d]['hum'].append(entry['main']['humidity'])
+        daily[d]['rain'].append(entry.get('pop', 0) * 100)
 
-    sorted_dates = sorted(daily.keys())[:5]
-    if not sorted_dates:
-        raise ValueError("No forecast data available")
+    dates = sorted(daily.keys())[:5]
+    if not dates:
+        raise ValueError("No forecast data returned")
 
-    labels   = [datetime.strptime(d, "%Y-%m-%d").strftime("%a\n%d %b") for d in sorted_dates]
-    max_temps = [max(daily[d]['temps'])      for d in sorted_dates]
-    min_temps = [min(daily[d]['temps'])      for d in sorted_dates]
-    avg_hum   = [sum(daily[d]['humidity']) / len(daily[d]['humidity'])   for d in sorted_dates]
-    avg_rain  = [sum(daily[d]['rain_prob']) / len(daily[d]['rain_prob']) for d in sorted_dates]
+    labels   = [datetime.strptime(d, "%Y-%m-%d").strftime("%a\n%d %b") for d in dates]
+    avg_temp = [round(sum(daily[d]['temps']) / len(daily[d]['temps']), 1) for d in dates]
+    max_temp = [round(max(daily[d]['temps']), 1) for d in dates]
+    min_temp = [round(min(daily[d]['temps']), 1) for d in dates]
+    avg_hum  = [round(sum(daily[d]['hum'])   / len(daily[d]['hum']),   1) for d in dates]
+    avg_rain = [round(sum(daily[d]['rain'])  / len(daily[d]['rain']),  1) for d in dates]
 
-    x = np.arange(len(labels))
+    x     = np.arange(len(labels))
     bar_w = 0.5
 
-    # --- Figure setup ---
-    fig, ax1 = plt.subplots(figsize=(10, 6))
-    fig.patch.set_facecolor('#0f1923')
-    ax1.set_facecolor('#0f1923')
-
-    # Rain probability bars (background layer)
-    ax2 = ax1.twinx()
-    rain_bars = ax2.bar(x, avg_rain, width=bar_w, color='#3a7bd5',
-                        alpha=0.35, zorder=2, label='Rain chance (%)')
-    ax2.set_ylim(0, 130)
-    ax2.set_ylabel('Rain chance (%)', color='#3a7bd5', fontsize=9, labelpad=8)
-    ax2.tick_params(axis='y', colors='#3a7bd5', labelsize=8)
-    ax2.spines['right'].set_color('#3a7bd5')
-    ax2.spines['right'].set_alpha(0.4)
-    for spine in ['top', 'left', 'bottom']:
-        ax2.spines[spine].set_visible(False)
-
-    # Temperature band (fill between max and min)
-    ax1.fill_between(x, min_temps, max_temps,
-                     color='#FF6B35', alpha=0.18, zorder=3)
-    ax1.plot(x, max_temps, color='#FF6B35', marker='o', linewidth=2.2,
-             markersize=7, markerfacecolor='#FF6B35', markeredgecolor='#fff',
-             markeredgewidth=1.2, zorder=5, label=f"Max temp (°C)")
-    ax1.plot(x, min_temps, color='#FFA07A', marker='o', linewidth=1.6,
-             markersize=6, linestyle='--', markerfacecolor='#FFA07A',
-             markeredgecolor='#fff', markeredgewidth=1, zorder=5, label="Min temp (°C)")
-
-    # Humidity line
-    ax1.plot(x, avg_hum, color='#4ECDC4', marker='s', linewidth=2,
-             markersize=6, markerfacecolor='#4ECDC4', markeredgecolor='#fff',
-             markeredgewidth=1, zorder=5, label="Humidity (%)")
-
-    # Data labels on temperature points
-    for i, (hi, lo) in enumerate(zip(max_temps, min_temps)):
-        ax1.annotate(f"{hi:.0f}°", (x[i], hi), textcoords="offset points",
-                     xytext=(0, 9), ha='center', fontsize=8.5,
-                     color='#FF6B35', fontweight='bold')
-        ax1.annotate(f"{lo:.0f}°", (x[i], lo), textcoords="offset points",
-                     xytext=(0, -14), ha='center', fontsize=8,
-                     color='#FFA07A')
-
-    # Axes styling
-    ax1.set_xticks(x)
-    ax1.set_xticklabels(labels, fontsize=9, color='#c9d1d9')
-    ax1.tick_params(axis='y', colors='#c9d1d9', labelsize=8)
-    ax1.set_ylabel('Temperature & Humidity', color='#c9d1d9', fontsize=9, labelpad=8)
-    ax1.yaxis.set_label_position('left')
-    for spine in ['top', 'right']:
-        ax1.spines[spine].set_visible(False)
-    for spine in ['left', 'bottom']:
-        ax1.spines[spine].set_color('#30363d')
-    ax1.tick_params(axis='x', colors='#c9d1d9', length=0)
-    ax1.grid(axis='y', color='#30363d', linestyle='--', alpha=0.5, zorder=1)
-
-    # Title
-    ax1.set_title(
-        f"🌾 5-Day Forecast  ·  {city_name}",
-        color='#e6edf3', fontsize=13, fontweight='bold', pad=14, loc='left'
+    # --- Two-panel figure ---
+    fig, (ax_t, ax_b) = plt.subplots(
+        2, 1, figsize=(9, 7),
+        gridspec_kw={'height_ratios': [3, 2], 'hspace': 0.08}
     )
+    fig.patch.set_facecolor(BG)
+    for ax in (ax_t, ax_b):
+        ax.set_facecolor(PANEL)
+        ax.set_xticks(x)
+        ax.tick_params(colors=SUBTEXT, length=0)
+        for spine in ax.spines.values():
+            spine.set_color(BORDER)
+        ax.grid(axis='y', color=BORDER, linestyle='--', alpha=0.45, zorder=1)
 
-    # Legend
-    handles = [
-        mpatches.Patch(color='#FF6B35', label='Max temp (°C)'),
-        mpatches.Patch(color='#FFA07A', label='Min temp (°C)'),
-        mpatches.Patch(color='#4ECDC4', label='Humidity (%)'),
-        mpatches.Patch(color='#3a7bd5', alpha=0.6, label='Rain chance (%)'),
+    # ── TOP: Temperature ──────────────────────────────────────────────────────
+    # Shaded high-low band
+    ax_t.fill_between(x, min_temp, max_temp, color=C_TEMP, alpha=0.10, zorder=2)
+
+    # High / low tick bars
+    for i in range(len(x)):
+        ax_t.plot([x[i], x[i]], [min_temp[i], max_temp[i]],
+                  color=BORDER, linewidth=1.2, zorder=3)
+        ax_t.plot(x[i], max_temp[i], marker='^', color=C_HIGH,
+                  markersize=7, zorder=4)
+        ax_t.plot(x[i], min_temp[i], marker='v', color=C_LOW,
+                  markersize=7, zorder=4)
+
+    # Average temp line
+    ax_t.plot(x, avg_temp, color=C_TEMP, linewidth=2.4, marker='o',
+              markersize=8, markerfacecolor=C_TEMP, markeredgecolor=BG,
+              markeredgewidth=1.5, zorder=5, label='Avg temp')
+
+    # Labels above/below markers
+    t_pad = (max(max_temp) - min(min_temp)) * 0.07 or 1
+    for i, (avg, hi, lo) in enumerate(zip(avg_temp, max_temp, min_temp)):
+        ax_t.annotate(f"{avg:.0f}°", (x[i], avg),
+                      textcoords="offset points", xytext=(0, 10),
+                      ha='center', fontsize=9, color=C_TEMP, fontweight='bold')
+        ax_t.annotate(f"↑{hi:.0f}°", (x[i], hi),
+                      textcoords="offset points", xytext=(12, 0),
+                      ha='left', fontsize=7.5, color=C_HIGH)
+        ax_t.annotate(f"↓{lo:.0f}°", (x[i], lo),
+                      textcoords="offset points", xytext=(12, 0),
+                      ha='left', fontsize=7.5, color=C_LOW)
+
+    temp_margin = max(3, (max(max_temp) - min(min_temp)) * 0.3)
+    ax_t.set_ylim(min(min_temp) - temp_margin, max(max_temp) + temp_margin + 3)
+    ax_t.set_xticklabels([])   # shared with bottom panel
+    ax_t.set_ylabel('Temperature (°C)', color=SUBTEXT, fontsize=9)
+    ax_t.tick_params(axis='y', colors=SUBTEXT, labelsize=8)
+
+    legend_handles = [
+        mpatches.Patch(color=C_TEMP,  label='Avg temp (°C)'),
+        mpatches.Patch(color=C_HIGH,  label='Daily high'),
+        mpatches.Patch(color=C_LOW,   label='Daily low'),
     ]
-    ax1.legend(handles=handles, loc='upper right', fontsize=8,
-               facecolor='#161b22', edgecolor='#30363d', labelcolor='#c9d1d9',
-               framealpha=0.85)
+    ax_t.legend(handles=legend_handles, loc='upper right', fontsize=8,
+                facecolor='#0d1117', edgecolor=BORDER, labelcolor=TEXT,
+                framealpha=0.9, ncol=3)
 
-    # Footer
-    fig.text(0.99, 0.01, 'Data: OpenWeatherMap', ha='right', va='bottom',
+    ax_t.set_title(f"🌾  5-Day Forecast  ·  {city_name}",
+                   color=TEXT, fontsize=13, fontweight='bold', pad=10, loc='left')
+
+    # ── BOTTOM: Humidity & Rain ───────────────────────────────────────────────
+    w = bar_w / 2
+    bars_h = ax_b.bar(x - w/2, avg_hum,  width=w, color=C_HUM,  alpha=0.85,
+                      zorder=3, label='Humidity (%)')
+    bars_r = ax_b.bar(x + w/2, avg_rain, width=w, color=C_RAIN, alpha=0.85,
+                      zorder=3, label='Rain chance (%)')
+
+    # Value labels on bars
+    for bar, val in zip(bars_h, avg_hum):
+        if val > 0:
+            ax_b.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1,
+                      f"{val:.0f}%", ha='center', va='bottom',
+                      fontsize=7.5, color=C_HUM, fontweight='bold')
+    for bar, val in zip(bars_r, avg_rain):
+        if val > 0:
+            ax_b.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1,
+                      f"{val:.0f}%", ha='center', va='bottom',
+                      fontsize=7.5, color=C_RAIN, fontweight='bold')
+
+    ax_b.set_ylim(0, 110)
+    ax_b.set_xticklabels(labels, fontsize=9, color=SUBTEXT)
+    ax_b.tick_params(axis='y', colors=SUBTEXT, labelsize=8)
+    ax_b.set_ylabel('Percent (%)', color=SUBTEXT, fontsize=9)
+    ax_b.legend(loc='upper right', fontsize=8,
+                facecolor='#0d1117', edgecolor=BORDER, labelcolor=TEXT,
+                framealpha=0.9)
+
+    fig.text(0.99, 0.005, 'Data: OpenWeatherMap', ha='right', va='bottom',
              fontsize=7, color='#484f58')
 
-    plt.tight_layout(pad=1.5)
+    plt.tight_layout(pad=1.2)
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=130, bbox_inches='tight',
+    plt.savefig(buf, format='png', dpi=140, bbox_inches='tight',
                 facecolor=fig.get_facecolor())
     buf.seek(0)
     plt.close(fig)

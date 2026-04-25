@@ -643,9 +643,23 @@ def speak_text(request):
         
         if not text:
             return JsonResponse({'success': False, 'error': 'No text provided'}, status=400)
-        
-        # Clean text
-        clean_text = text.replace('*', '').replace('#', '')
+
+        # Strip markdown formatting so it isn't read aloud literally
+        import re as _re
+        clean_text = text
+        clean_text = _re.sub(r'\[FARMBUDDY_REFS\].*?\[/FARMBUDDY_REFS\]', '', clean_text, flags=_re.DOTALL)
+        clean_text = _re.sub(r'\*\*(.*?)\*\*', r'\1', clean_text)
+        clean_text = _re.sub(r'\*(.*?)\*', r'\1', clean_text)
+        clean_text = _re.sub(r'_(.*?)_', r'\1', clean_text)
+        clean_text = _re.sub(r'`[^`]*`', '', clean_text)
+        clean_text = _re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', clean_text)
+        clean_text = _re.sub(r'^#{1,6}\s*', '', clean_text, flags=_re.MULTILINE)
+        clean_text = _re.sub(r'^\s*[-*]\s+', '', clean_text, flags=_re.MULTILINE)
+        clean_text = _re.sub(r'^\s*\d+\.\s+', '', clean_text, flags=_re.MULTILINE)
+        clean_text = _re.sub(r'\n{3,}', '\n\n', clean_text).strip()
+        # YarnGPT works best with concise input; cap at 1000 chars
+        if len(clean_text) > 1000:
+            clean_text = clean_text[:1000].rsplit(' ', 1)[0] + '...'
         
         # Use YarnGPT API for all languages
         from utils.gemini_api import YARNGPT_API_KEY, YARNGPT_API_URL

@@ -391,8 +391,13 @@ export default function ChatPage() {
 
     try {
       const response = await fetch(
-        `${API_BASE}/api/speak/?text=${encodeURIComponent(message.content)}&language=${preferredLanguage}`,
-        { credentials: 'include' }
+        `${API_BASE}/api/speak/`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: message.content, language: preferredLanguage }),
+        }
       )
       if (!response.ok) throw new Error(`TTS request failed: ${response.status}`)
       const blob = await response.blob()

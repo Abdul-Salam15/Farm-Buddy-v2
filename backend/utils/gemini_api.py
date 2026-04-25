@@ -102,30 +102,32 @@ def ask_gemini(messages_history: list, weather_context=None, profile_context=Non
         if stream:
             def stream_generator():
                 try:
+                    fn_call = None
                     for chunk in response:
                         if chunk.parts and chunk.parts[0].function_call:
-                            fn = chunk.parts[0].function_call
-                            if fn.name == "check_weather_for_ai":
-                                yield f" [Status: Gathering weather info for {fn.args.get('city_name', 'your location')}...] "
-                                args = {key: val for key, val in fn.args.items()}
-                                weather_result = check_weather_for_ai(**args)
-                                
-                                # Send result back to Gemini
-                                func_response = genai.protos.Part(
-                                    function_response=genai.protos.FunctionResponse(
-                                        name=fn.name, 
-                                        response={"result": weather_result}
-                                    )
-                                )
-                                follow_up_response = chat.send_message(func_response, stream=True)
-                                for text_chunk in follow_up_response:
-                                    if text_chunk.text:
-                                        yield text_chunk.text
+                            fn_call = chunk.parts[0].function_call
+                            if fn_call.name == "check_weather_for_ai":
+                                yield f"[Status: Gathering weather info for {fn_call.args.get('city_name', 'your location')}...]\n\n"
+                            break  # Exit first stream before sending function response
                         elif chunk.text:
                             yield chunk.text
+
+                    if fn_call and fn_call.name == "check_weather_for_ai":
+                        args = {key: val for key, val in fn_call.args.items()}
+                        weather_result = check_weather_for_ai(**args)
+                        func_response = genai.protos.Part(
+                            function_response=genai.protos.FunctionResponse(
+                                name=fn_call.name,
+                                response={"result": weather_result}
+                            )
+                        )
+                        follow_up = chat.send_message(func_response, stream=True)
+                        for text_chunk in follow_up:
+                            if text_chunk.text:
+                                yield text_chunk.text
                 except Exception as e:
                     print(f"Error during streaming: {e}")
-                    yield " [Error: Interrupted] "
+                    yield f"\n[Sorry, I encountered an error. Please try again.]"
             return stream_generator()
         else:
             if response.parts and response.parts[0].function_call:

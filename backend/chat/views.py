@@ -162,14 +162,19 @@ def send_message(request):
                 except Exception:
                     clean_text, refs = full_response, []
 
+                # Strip any leading [Status: ...] lines injected during function calling
+                import re as _re
+                clean_text = _re.sub(r'^\[Status:[^\]]*\]\s*\n*', '', clean_text).strip()
+                full_response_display = _re.sub(r'^\[Status:[^\]]*\]\s*\n*', '', full_response).strip()
+
                 Message.objects.create(
                     conversation=conversation,
                     role='assistant',
                     content=clean_text,
                     references=refs
                 )
-                
-                yield json.dumps({'success': True, 'full_text': full_response, 'references': refs, 'conversation_id': conversation.id}) + "\n"
+
+                yield json.dumps({'success': True, 'full_text': full_response_display, 'references': refs, 'conversation_id': conversation.id}) + "\n"
                 
                 if conversation.messages.count() == 2 and (not conversation.title or conversation.title == "New Chat"):
                      def update_title_background(conv_id, text):

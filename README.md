@@ -40,6 +40,28 @@ FarmBuddy is a full-stack agricultural assistant that delivers personalised, rea
 
 ---
 
+## Recent Improvements 🚀
+
+FarmBuddy is constantly evolving. Key recent updates include:
+- **Robust Internationalization**: Enforced English as the global default with hydration-safe context management.
+- **Enhanced Signup Flow**: Improved multi-step signup with structured error handling, name synchronization, and optional farm detail sanitization.
+- **Security Hardening**: Fixed critical vulnerabilities including unprotected JSON parsing, cross-platform password reset logic, and CSRF protection.
+- **Voice Performance**: Optimized TTS (Text-to-Speech) latency and improved STT (Speech-to-Text) accuracy for Nigerian accents.
+- **UI/UX Polishing**: Fixed hydration errors, improved chat layout responsiveness, and standardized translation dictionaries across 4 languages.
+
+---
+
+## Security & Privacy 🔐
+
+The safety of farmer data is a priority. FarmBuddy implements:
+- **CSRF Protection**: All state-changing operations require a valid CSRF token, even for the PWA frontend.
+- **Secure Password Hashing**: Utilizes Django's PBKDF2 with SHA256 for all user credentials.
+- **Security Question Recovery**: A stateless recovery mechanism using a hashed security answer (grandfather's name), allowing password resets without an email address — ideal for rural users.
+- **Data Isolation**: Each farmer's chat history and farm metadata are strictly isolated and only accessible to the authenticated owner.
+
+
+---
+
 ## Architecture
 
 ### System Overview
@@ -204,6 +226,21 @@ In a third terminal with the backend virtualenv active:
 cd backend
 python manage.py run_telegram_bot
 ```
+
+---
+
+## Troubleshooting 🛠️
+
+### Common Issues
+
+| Issue | Solution |
+|---|---|
+| **`ffmpeg` not found** | Required for audio processing. Ensure it's installed and in your system PATH. |
+| **"Invalid API Key"** | Check your `backend/.env` file. Ensure `GOOGLE_API_KEY` has permission for Gemini Flash and Vision. |
+| **Port 8000 already in use** | Run the backend on a different port: `python manage.py runserver 8001`. Update `NEXT_PUBLIC_API_URL` in `.env.local` accordingly. |
+| **PWA not installing** | PWAs require HTTPS or `localhost` to work. Ensure you are accessing the app via `localhost:3000` during development. |
+| **Telegram Bot not responding** | Ensure your `TELEGRAM_BOT_TOKEN` is correct and that the `run_telegram_bot` process is running. |
+
 
 ---
 

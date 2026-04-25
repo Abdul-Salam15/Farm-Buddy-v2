@@ -11,13 +11,13 @@ class FarmerProfileInline(admin.StackedInline):
     verbose_name_plural = "Farmer Profile"
     fk_name = "user"
     fields = (
-        ("preferred_language",),
+        "preferred_language",
         ("first_name", "last_name"),
         ("phone_number", "location"),
         ("farm_size_acres", "soil_type"),
         ("ph_level", "water_source"),
         ("current_crops", "past_crops"),
-        ("top_pests",),
+        "top_pests",
         ("has_livestock", "livestock_types"),
         ("telegram_chat_id", "telegram_link_token"),
     )

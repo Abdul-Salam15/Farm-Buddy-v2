@@ -413,12 +413,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             welcome = l['welcome_back'].format(name=info['username'])
             await update.message.reply_text(welcome)
         else:
+            l = get_localized_labels('en')
             keyboard = [
-                [InlineKeyboardButton("English 🇬🇧", callback_data='onboard_lang_en'), InlineKeyboardButton("Hausa 🇳🇬", callback_data='onboard_lang_ha')],
-                [InlineKeyboardButton("Igbo 🇳🇬", callback_data='onboard_lang_ig'), InlineKeyboardButton("Yoruba 🇳🇬", callback_data='onboard_lang_yo')]
+                [InlineKeyboardButton(l['btn_login'],  callback_data='auth_login')],
+                [InlineKeyboardButton(l['btn_signup'], callback_data='auth_signup')],
+                [InlineKeyboardButton(l['btn_forgot'], callback_data='auth_forgot')],
+                [InlineKeyboardButton(l['btn_link'],   callback_data='auth_link')],
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_text("🌍 **Please select your language** / **Jọwọ yan asụsụ gị** / **Zaɓi yarenku**:", reply_markup=reply_markup)
+            await update.message.reply_text(l['auth_welcome'], reply_markup=reply_markup, parse_mode='Markdown')
 
 async def onboard_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Callback after language is selected in /start."""
@@ -643,43 +646,31 @@ async def signup_soil(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def signup_pests(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['su_pests'] = update.message.text
-    l = get_localized_labels('en')
-    
-    keyboard = [
-        [InlineKeyboardButton("English 🇬🇧", callback_data='su_lang_en'), InlineKeyboardButton("Hausa 🇳🇬", callback_data='su_lang_ha')],
-        [InlineKeyboardButton("Igbo 🇳🇬", callback_data='su_lang_ig'), InlineKeyboardButton("Yoruba 🇳🇬", callback_data='su_lang_yo')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(l['signup_lang'], reply_markup=reply_markup)
-    return S_LANGUAGE
-
-async def signup_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    
-    lang = query.data.replace('su_lang_', '')
     chat_id = update.effective_chat.id
-    
+    l = get_localized_labels('en')
+
     data = context.user_data
     user, profile = await sync_to_async(db_register_user)(
-        data['su_username'], 
+        data['su_username'],
         data['su_password'],
         data['su_name'],
         data['su_loc'],
-        lang,
+        'en',
         acres=data.get('su_acres', 0),
         soil=data.get('su_soil', 'unknown'),
         pests=data.get('su_pests', ''),
         security_answer=data.get('su_grandfather', '')
     )
-    
+
     if user:
         await sync_to_async(db_link_user_by_id)(user.id, chat_id)
-        l = get_localized_labels(lang)
-        await query.edit_message_text(l['signup_done'])
+        await update.message.reply_text(
+            l['signup_done'] + "\n\nYou can change your language anytime with /language.",
+            parse_mode='Markdown'
+        )
     else:
-        await query.edit_message_text("❌ Signup failed. Please try again with /start.")
-        
+        await update.message.reply_text("❌ Signup failed. Please try again with /start.")
+
     return ConversationHandler.END
 
 async def dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1229,7 +1220,6 @@ def run_bot():
             S_ACRES: [MessageHandler(filters.TEXT & (~filters.COMMAND), signup_acres)],
             S_SOIL: [CallbackQueryHandler(signup_soil, pattern='^su_soil_')],
             S_PESTS: [MessageHandler(filters.TEXT & (~filters.COMMAND), signup_pests)],
-            S_LANGUAGE: [CallbackQueryHandler(signup_finish, pattern='^su_lang_')],
         },
         fallbacks=[CommandHandler('cancel', cancel)],
         name="signup_conv",
@@ -1252,9 +1242,7 @@ def run_bot():
         persistent=False
     )
     
-    # Existing token/deep link logic and info callback
     link_info_handler = CallbackQueryHandler(connect, pattern='^auth_link$')
-    onboard_start_handler = CallbackQueryHandler(onboard_start, pattern='^onboard_lang_')
 
     # Edit Profile Conversation
     edit_conv_handler = ConversationHandler(
@@ -1281,7 +1269,6 @@ def run_bot():
     application.add_handler(connect_handler)
     application.add_handler(lang_cb_handler)
     application.add_handler(link_info_handler)
-    application.add_handler(onboard_start_handler)
     
     application.add_handler(login_conv_handler)
     application.add_handler(signup_conv_handler)

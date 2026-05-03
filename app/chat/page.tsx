@@ -722,9 +722,10 @@ export default function ChatPage() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
       })
-      window.location.href = "/login"
     } catch (err) {
       console.error("Logout failed", err)
+    } finally {
+      localStorage.setItem("preferred_language", "en")
       window.location.href = "/login"
     }
   }

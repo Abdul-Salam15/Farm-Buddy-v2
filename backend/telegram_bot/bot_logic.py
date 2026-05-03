@@ -120,18 +120,29 @@ def db_check_username(username):
     return User.objects.filter(username__iexact=username).exists()
 
 @_db
-def db_register_user(username, password, full_name, location, language, acres=0, soil='unknown', pests='', security_answer=''):
+def db_register_user(username, password, first_name, last_name, location, language,
+                     acres=0, soil='unknown', ph_level='unknown', water_source='rainfed',
+                     current_crops='', past_crops='', pests='',
+                     has_livestock=False, livestock_types='', security_answer=''):
     if User.objects.filter(username=username).exists():
         return None
-    user = User.objects.create_user(username=username, password=password, first_name=full_name)
+    user = User.objects.create_user(username=username, password=password,
+                                    first_name=first_name, last_name=last_name)
     profile = FarmerProfile.objects.create(
         user=user,
-        first_name=full_name,
+        first_name=first_name,
+        last_name=last_name,
         location=location,
         preferred_language=language,
-        farm_size_acres=acres,
+        farm_size_acres=acres if acres else None,
         soil_type=soil,
+        ph_level=ph_level,
+        water_source=water_source,
+        current_crops=current_crops,
+        past_crops=past_crops,
         top_pests=pests,
+        has_livestock=has_livestock,
+        livestock_types=livestock_types,
     )
     if security_answer:
         profile.set_security_answer(security_answer.strip().lower())
@@ -211,16 +222,32 @@ def get_localized_labels(lang):
             'reset_success': "✅ Password reset successful! You can now log in with your new password.",
             'reset_failed': "❌ Answer incorrect. Password reset failed.",
             'user_not_found': "❌ Username not found.",
-            'signup_user': "Great! Let's create your account. What **username** would you like to use?",
+            'signup_user': "Great! Let's create your account.\n\nWhat **username** would you like to use?",
             'signup_pass': "Choose a **strong password** (at least 6 characters):",
-            'signup_name': "What is your **full name**?",
-            'signup_loc': "Which **town and state** do you farm in?",
-            'signup_size': "What is your **farm size** in acres? (Just send a number)",
+            'signup_name': "What is your **first name**?",
+            'signup_last_name': "What is your **last name**?",
+            'signup_loc': "Which **town and state** do you farm in? (e.g. Iwo, Osun)",
+            'signup_size': "What is your **farm size** in acres? (Enter a number, or 0 if unsure)",
             'signup_soil': "What is your **soil type**?",
-            'signup_pests': "Which **pests or diseases** do you usually encounter? (e.g. armyworms, aphids)",
+            'signup_ph': "What is your **soil acidity (pH)**?",
+            'signup_water': "What is your main **water source** for farming?",
+            'signup_crops': "🌾 What crops are you **currently growing**? (e.g. maize, cassava — or type *none*)",
+            'signup_past_crops': "What crops have you **grown before**? (or type *none*)",
+            'signup_pests': "Which **pests or diseases** do you usually encounter? (e.g. armyworms, aphids — or type *none*)",
+            'signup_livestock_ask': "Do you keep any **livestock**?",
+            'signup_livestock_types': "What **type of animals** do you keep? (e.g. goats, poultry)",
             'signup_lang': "Which **language** do you prefer?",
             'user_exists': "❌ This username is already taken. Please try another one:",
             'signup_done': "🎉 Account created successfully! You can now use FarmBuddy.",
+            'ph_acidic': "Acidic (tastes sour / kills grass)",
+            'ph_neutral': "Neutral (normal soil)",
+            'ph_alkaline': "Alkaline (white crust on surface)",
+            'ph_unknown': "I am not sure",
+            'water_rainfed': "Rainfed only",
+            'water_irrigated': "I have irrigation",
+            'water_seasonal': "Seasonal stream / borehole",
+            'livestock_yes': "Yes",
+            'livestock_no': "No",
             'connect_info': "To use FarmBuddy on Telegram, you can either:\n\n1. Use the **'Open Telegram'** button on the website's 'My Farm' page.\n2. **Log in** directly here if you already have an account.\n3. **Sign up** to create a new account.",
         },
         'ha': {
@@ -528,8 +555,10 @@ async def logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- AUTH CONVERSATIONS ---
 L_USERNAME, L_PASSWORD = range(10, 12)
-S_USERNAME, S_PASSWORD, S_GRANDFATHER, S_NAME, S_LOCATION, S_ACRES, S_SOIL, S_PESTS, S_LANGUAGE = range(20, 29)
-R_USERNAME, R_ANSWER, R_NEW_PASS = range(30, 33)
+(S_USERNAME, S_PASSWORD, S_GRANDFATHER, S_LANGUAGE, S_NAME, S_LAST_NAME,
+ S_LOCATION, S_ACRES, S_SOIL, S_PH, S_WATER, S_CROPS, S_PAST_CROPS,
+ S_PESTS, S_LIVESTOCK, S_LIVESTOCK_TYPES) = range(20, 36)
+R_USERNAME, R_ANSWER, R_NEW_PASS = range(40, 43)
 
 # LOGIN FLOW
 async def login_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -568,49 +597,68 @@ async def login_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def signup_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if query: await query.answer()
-    
     l = get_localized_labels('en')
     target = query.message if query else update.message
     await target.reply_text(l['signup_user'], parse_mode='Markdown')
     return S_USERNAME
 
 async def signup_username(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    username = update.message.text
+    username = update.message.text.strip()
     exists = await sync_to_async(db_check_username)(username)
     l = get_localized_labels('en')
-    
     if exists:
         await update.message.reply_text(l['user_exists'])
         return S_USERNAME
-    
     context.user_data['su_username'] = username
     await update.message.reply_text(l['signup_pass'], parse_mode='Markdown')
     return S_PASSWORD
+
 async def signup_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     password = update.message.text
     if len(password) < 6:
         await update.message.reply_text("❌ Password too short. Please enter at least 6 characters:")
         return S_PASSWORD
-    
     context.user_data['su_password'] = password
     l = get_localized_labels('en')
     await update.message.reply_text(l['prompt_grandfather'], parse_mode='Markdown')
     return S_GRANDFATHER
 
 async def signup_grandfather(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['su_grandfather'] = update.message.text
+    context.user_data['su_grandfather'] = update.message.text.strip()
     l = get_localized_labels('en')
-    await update.message.reply_text(l['signup_name'], parse_mode='Markdown')
+    keyboard = [
+        [InlineKeyboardButton("English 🇬🇧",  callback_data='su_lang_en'),
+         InlineKeyboardButton("Hausa 🇳🇬",    callback_data='su_lang_ha')],
+        [InlineKeyboardButton("Igbo 🇳🇬",     callback_data='su_lang_ig'),
+         InlineKeyboardButton("Yoruba 🇳🇬",   callback_data='su_lang_yo')],
+    ]
+    await update.message.reply_text(l['signup_lang'], reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
+    return S_LANGUAGE
+
+async def signup_lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    lang = query.data.replace('su_lang_', '')
+    context.user_data['su_lang'] = lang
+    l = get_localized_labels('en')
+    await query.edit_message_text(f"✅ Language set.")
+    await context.bot.send_message(update.effective_chat.id, l['signup_name'], parse_mode='Markdown')
     return S_NAME
 
 async def signup_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['su_name'] = update.message.text
+    context.user_data['su_first_name'] = update.message.text.strip()
+    l = get_localized_labels('en')
+    await update.message.reply_text(l['signup_last_name'], parse_mode='Markdown')
+    return S_LAST_NAME
+
+async def signup_last_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data['su_last_name'] = update.message.text.strip()
     l = get_localized_labels('en')
     await update.message.reply_text(l['signup_loc'], parse_mode='Markdown')
     return S_LOCATION
 
 async def signup_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['su_loc'] = update.message.text
+    context.user_data['su_loc'] = update.message.text.strip()
     l = get_localized_labels('en')
     await update.message.reply_text(l['signup_size'], parse_mode='Markdown')
     return S_ACRES
@@ -620,56 +668,137 @@ async def signup_acres(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['su_acres'] = float(update.message.text)
     except ValueError:
         context.user_data['su_acres'] = 0
-    
     l = get_localized_labels('en')
-    # Soil type keyboard
     keyboard = [
-        [InlineKeyboardButton(l['loamy'], callback_data='su_soil_loamy'), InlineKeyboardButton(l['sandy'], callback_data='su_soil_sandy')],
-        [InlineKeyboardButton(l['clay'], callback_data='su_soil_clay'), InlineKeyboardButton(l['silty'], callback_data='su_soil_silty')],
-        [InlineKeyboardButton(l['not_sure'], callback_data='su_soil_unknown')]
+        [InlineKeyboardButton(l['loamy'],    callback_data='su_soil_loamy'),
+         InlineKeyboardButton(l['sandy'],    callback_data='su_soil_sandy')],
+        [InlineKeyboardButton(l['clay'],     callback_data='su_soil_clay'),
+         InlineKeyboardButton(l['silty'],    callback_data='su_soil_silty')],
+        [InlineKeyboardButton(l['not_sure'], callback_data='su_soil_unknown')],
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(l['signup_soil'], reply_markup=reply_markup)
+    await update.message.reply_text(l['signup_soil'], reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
     return S_SOIL
 
 async def signup_soil(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
-    soil_choice = query.data.replace('su_soil_', '')
-    context.user_data['su_soil'] = soil_choice
-    
+    context.user_data['su_soil'] = query.data.replace('su_soil_', '')
     l = get_localized_labels('en')
-    await query.edit_message_text(f"Selected Soil: {soil_choice.capitalize()}")
-    await context.bot.send_message(update.effective_chat.id, l['signup_pests'], parse_mode='Markdown')
+    await query.edit_message_text(f"✅ Soil type saved.")
+    keyboard = [
+        [InlineKeyboardButton(l['ph_acidic'],   callback_data='su_ph_acidic')],
+        [InlineKeyboardButton(l['ph_neutral'],  callback_data='su_ph_neutral')],
+        [InlineKeyboardButton(l['ph_alkaline'], callback_data='su_ph_alkaline')],
+        [InlineKeyboardButton(l['ph_unknown'],  callback_data='su_ph_unknown')],
+    ]
+    await context.bot.send_message(update.effective_chat.id, l['signup_ph'],
+                                   reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
+    return S_PH
+
+async def signup_ph(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    context.user_data['su_ph'] = query.data.replace('su_ph_', '')
+    l = get_localized_labels('en')
+    await query.edit_message_text("✅ Soil pH saved.")
+    keyboard = [
+        [InlineKeyboardButton(l['water_rainfed'],   callback_data='su_water_rainfed')],
+        [InlineKeyboardButton(l['water_irrigated'], callback_data='su_water_irrigated')],
+        [InlineKeyboardButton(l['water_seasonal'],  callback_data='su_water_seasonal')],
+    ]
+    await context.bot.send_message(update.effective_chat.id, l['signup_water'],
+                                   reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
+    return S_WATER
+
+async def signup_water(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    context.user_data['su_water'] = query.data.replace('su_water_', '')
+    l = get_localized_labels('en')
+    await query.edit_message_text("✅ Water source saved.")
+    await context.bot.send_message(update.effective_chat.id, l['signup_crops'], parse_mode='Markdown')
+    return S_CROPS
+
+async def signup_crops(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    val = update.message.text.strip()
+    context.user_data['su_crops'] = '' if val.lower() == 'none' else val
+    l = get_localized_labels('en')
+    await update.message.reply_text(l['signup_past_crops'], parse_mode='Markdown')
+    return S_PAST_CROPS
+
+async def signup_past_crops(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    val = update.message.text.strip()
+    context.user_data['su_past_crops'] = '' if val.lower() == 'none' else val
+    l = get_localized_labels('en')
+    await update.message.reply_text(l['signup_pests'], parse_mode='Markdown')
     return S_PESTS
 
 async def signup_pests(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['su_pests'] = update.message.text
+    val = update.message.text.strip()
+    context.user_data['su_pests'] = '' if val.lower() == 'none' else val
+    l = get_localized_labels('en')
+    keyboard = [
+        [InlineKeyboardButton(l['livestock_yes'], callback_data='su_livestock_yes'),
+         InlineKeyboardButton(l['livestock_no'],  callback_data='su_livestock_no')],
+    ]
+    await update.message.reply_text(l['signup_livestock_ask'],
+                                    reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
+    return S_LIVESTOCK
+
+async def signup_livestock(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    has_livestock = query.data == 'su_livestock_yes'
+    context.user_data['su_livestock'] = has_livestock
+    l = get_localized_labels('en')
+    if has_livestock:
+        await query.edit_message_text("✅ Livestock: Yes")
+        await context.bot.send_message(update.effective_chat.id, l['signup_livestock_types'], parse_mode='Markdown')
+        return S_LIVESTOCK_TYPES
+    else:
+        await query.edit_message_text("✅ Livestock: No")
+        return await _signup_finish(update, context)
+
+async def signup_livestock_types(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data['su_livestock_types'] = update.message.text.strip()
+    return await _signup_finish(update, context)
+
+async def _signup_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Create the account and link it to this Telegram chat."""
     chat_id = update.effective_chat.id
+    data = context.user_data
+    lang = data.get('su_lang', 'en')
     l = get_localized_labels('en')
 
-    data = context.user_data
-    user, profile = await sync_to_async(db_register_user)(
+    result = await sync_to_async(db_register_user)(
         data['su_username'],
         data['su_password'],
-        data['su_name'],
-        data['su_loc'],
-        'en',
+        data.get('su_first_name', ''),
+        data.get('su_last_name', ''),
+        data.get('su_loc', ''),
+        lang,
         acres=data.get('su_acres', 0),
         soil=data.get('su_soil', 'unknown'),
+        ph_level=data.get('su_ph', 'unknown'),
+        water_source=data.get('su_water', 'rainfed'),
+        current_crops=data.get('su_crops', ''),
+        past_crops=data.get('su_past_crops', ''),
         pests=data.get('su_pests', ''),
-        security_answer=data.get('su_grandfather', '')
+        has_livestock=data.get('su_livestock', False),
+        livestock_types=data.get('su_livestock_types', ''),
+        security_answer=data.get('su_grandfather', ''),
     )
 
-    if user:
+    if result:
+        user, _ = result
         await sync_to_async(db_link_user_by_id)(user.id, chat_id)
-        await update.message.reply_text(
-            l['signup_done'] + "\n\nYou can change your language anytime with /language.",
+        await context.bot.send_message(
+            chat_id,
+            l['signup_done'] + "\n\nUse /language to change your language anytime.",
             parse_mode='Markdown'
         )
     else:
-        await update.message.reply_text("❌ Signup failed. Please try again with /start.")
+        await context.bot.send_message(chat_id, "❌ Signup failed. Username may already exist. Please try again with /start.")
 
     return ConversationHandler.END
 
@@ -1212,14 +1341,22 @@ def run_bot():
             CallbackQueryHandler(signup_start, pattern='^auth_signup$')
         ],
         states={
-            S_USERNAME: [MessageHandler(filters.TEXT & (~filters.COMMAND), signup_username)],
-            S_PASSWORD: [MessageHandler(filters.TEXT & (~filters.COMMAND), signup_password)],
-            S_GRANDFATHER: [MessageHandler(filters.TEXT & (~filters.COMMAND), signup_grandfather)],
-            S_NAME: [MessageHandler(filters.TEXT & (~filters.COMMAND), signup_name)],
-            S_LOCATION: [MessageHandler(filters.TEXT & (~filters.COMMAND), signup_location)],
-            S_ACRES: [MessageHandler(filters.TEXT & (~filters.COMMAND), signup_acres)],
-            S_SOIL: [CallbackQueryHandler(signup_soil, pattern='^su_soil_')],
-            S_PESTS: [MessageHandler(filters.TEXT & (~filters.COMMAND), signup_pests)],
+            S_USERNAME:        [MessageHandler(filters.TEXT & (~filters.COMMAND), signup_username)],
+            S_PASSWORD:        [MessageHandler(filters.TEXT & (~filters.COMMAND), signup_password)],
+            S_GRANDFATHER:     [MessageHandler(filters.TEXT & (~filters.COMMAND), signup_grandfather)],
+            S_LANGUAGE:        [CallbackQueryHandler(signup_lang,          pattern='^su_lang_')],
+            S_NAME:            [MessageHandler(filters.TEXT & (~filters.COMMAND), signup_name)],
+            S_LAST_NAME:       [MessageHandler(filters.TEXT & (~filters.COMMAND), signup_last_name)],
+            S_LOCATION:        [MessageHandler(filters.TEXT & (~filters.COMMAND), signup_location)],
+            S_ACRES:           [MessageHandler(filters.TEXT & (~filters.COMMAND), signup_acres)],
+            S_SOIL:            [CallbackQueryHandler(signup_soil,          pattern='^su_soil_')],
+            S_PH:              [CallbackQueryHandler(signup_ph,            pattern='^su_ph_')],
+            S_WATER:           [CallbackQueryHandler(signup_water,         pattern='^su_water_')],
+            S_CROPS:           [MessageHandler(filters.TEXT & (~filters.COMMAND), signup_crops)],
+            S_PAST_CROPS:      [MessageHandler(filters.TEXT & (~filters.COMMAND), signup_past_crops)],
+            S_PESTS:           [MessageHandler(filters.TEXT & (~filters.COMMAND), signup_pests)],
+            S_LIVESTOCK:       [CallbackQueryHandler(signup_livestock,     pattern='^su_livestock_')],
+            S_LIVESTOCK_TYPES: [MessageHandler(filters.TEXT & (~filters.COMMAND), signup_livestock_types)],
         },
         fallbacks=[CommandHandler('cancel', cancel)],
         name="signup_conv",

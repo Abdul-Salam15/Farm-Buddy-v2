@@ -24,13 +24,24 @@ from utils.weather_api import get_forecast_by_city
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import check_password as check_hashed_password
+from django.db import close_old_connections
 import logging
 
 logger = logging.getLogger(__name__)
 
 # --- DB SYNC HELPERS ---
 # These functions MUST be called using sync_to_async from inside handlers.
+# Each one calls close_old_connections() so stale connections (e.g. after
+# Render sleeps) are discarded before any ORM access.
 
+def _db(func):
+    """Decorator: close stale DB connections before each ORM call."""
+    def wrapper(*args, **kwargs):
+        close_old_connections()
+        return func(*args, **kwargs)
+    return wrapper
+
+@_db
 def db_get_profile_by_token(token):
     try:
         profile = FarmerProfile.objects.get(telegram_link_token=token)
@@ -38,6 +49,7 @@ def db_get_profile_by_token(token):
     except FarmerProfile.DoesNotExist:
         return None, None
 
+@_db
 def db_link_profile(token, chat_id):
     try:
         profile = FarmerProfile.objects.get(telegram_link_token=token)
@@ -48,6 +60,7 @@ def db_link_profile(token, chat_id):
     except FarmerProfile.DoesNotExist:
         return None
 
+@_db
 def db_unlink_chat(chat_id):
     try:
         profile = FarmerProfile.objects.get(telegram_chat_id=chat_id)
@@ -57,6 +70,7 @@ def db_unlink_chat(chat_id):
     except FarmerProfile.DoesNotExist:
         return False
 
+@_db
 def db_get_profile_info(chat_id):
     try:
         profile = FarmerProfile.objects.get(telegram_chat_id=chat_id)
@@ -74,18 +88,21 @@ def db_get_profile_info(chat_id):
     except FarmerProfile.DoesNotExist:
         return None
 
+@_db
 def db_get_or_create_conv(user):
     conv, _ = Conversation.objects.get_or_create(user=user, title="Telegram Chat")
     return conv
 
+@_db
 def db_save_msg(conv, role, content):
     return Message.objects.create(conversation=conv, role=role, content=content)
 
+@_db
 def db_get_history(conv, limit=10):
     msgs = Message.objects.filter(conversation=conv).order_by('-created_at')[:limit]
-    # Reverse to get chronological
     return [{"role": m.role, "content": m.content} for m in reversed(msgs)]
 
+@_db
 def db_update_profile(chat_id, **kwargs):
     profile = FarmerProfile.objects.get(telegram_chat_id=chat_id)
     for k, v in kwargs.items():
@@ -93,13 +110,16 @@ def db_update_profile(chat_id, **kwargs):
     profile.save()
     return profile
 
+@_db
 def db_authenticate_user(username, password):
     user = authenticate(username=username, password=password)
     return user
 
+@_db
 def db_check_username(username):
     return User.objects.filter(username__iexact=username).exists()
 
+@_db
 def db_register_user(username, password, full_name, location, language, acres=0, soil='unknown', pests='', security_answer=''):
     if User.objects.filter(username=username).exists():
         return None
@@ -117,9 +137,11 @@ def db_register_user(username, password, full_name, location, language, acres=0,
         profile.set_security_answer(security_answer.strip().lower())
     return user, profile
 
+@_db
 def db_migrate_security_answer(profile, answer):
     profile.set_security_answer(answer)
 
+@_db
 def db_get_profile_by_username(username):
     try:
         user = User.objects.get(username__iexact=username)
@@ -128,11 +150,13 @@ def db_get_profile_by_username(username):
     except (User.DoesNotExist, FarmerProfile.DoesNotExist):
         return None, None
 
+@_db
 def db_update_password(user, new_password):
     user.set_password(new_password)
     user.save()
     return True
 
+@_db
 def db_link_user_by_id(user_id, chat_id):
     try:
         profile = FarmerProfile.objects.get(user_id=user_id)
@@ -1148,6 +1172,16 @@ def run_bot():
         print("Bot commands registered.", flush=True)
 
     application = ApplicationBuilder().token(token).request(request).post_init(post_init).build()
+
+    async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+        logger.exception("Unhandled exception in bot handler", exc_info=context.error)
+        if isinstance(update, Update) and update.effective_message:
+            try:
+                await update.effective_message.reply_text("❌ Something went wrong. Please try again in a moment.")
+            except Exception:
+                pass
+
+    application.add_error_handler(global_error_handler)
 
     async def global_debug(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.effective_chat:

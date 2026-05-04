@@ -32,7 +32,8 @@ import {
   Pencil,
   Trash2,
   Check as SaveIcon,
-  ArrowDown
+  ArrowDown,
+  Search
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
@@ -92,6 +93,7 @@ export default function ChatPage() {
   const audioPlayerKey = preferredLanguage;
   const [editingConvId, setEditingConvId] = useState<number | null>(null)
   const [editingTitle, setEditingTitle] = useState("")
+  const [searchQuery, setSearchQuery] = useState("")
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recognitionRef = useRef<any>(null)
@@ -730,6 +732,10 @@ export default function ChatPage() {
     }
   }
 
+  const filteredConversations = conversations.filter(conv =>
+    conv.title.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
   const SidebarContent = () => (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-3 p-5">
@@ -739,7 +745,7 @@ export default function ChatPage() {
         <span className="text-lg font-semibold text-sidebar-foreground">FarmBuddy</span>
       </div>
 
-      <div className="px-4 pb-4">
+      <div className="px-4 pb-3">
         <Button
           className="w-full justify-start gap-2"
           onClick={handleNewChat}
@@ -749,16 +755,38 @@ export default function ChatPage() {
         </Button>
       </div>
 
+      {/* Search */}
+      <div className="px-4 pb-3">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-sidebar-foreground/40 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search chats..."
+            className="w-full rounded-lg border border-sidebar-border bg-sidebar-accent/40 py-2 pl-8 pr-3 text-sm text-sidebar-foreground placeholder:text-sidebar-foreground/40 outline-none focus:border-primary/50 focus:bg-sidebar-accent/60 transition-colors"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sidebar-foreground/40 hover:text-sidebar-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
       <ScrollArea className="flex-1 px-4">
         <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
           {t("chat.recent")}
         </p>
         <div className="space-y-1">
-          {conversations.length > 0 ? (
-            conversations.map((conv) => (
-              <div key={conv.id} className="group relative">
+          {filteredConversations.length > 0 ? (
+            filteredConversations.map((conv) => (
+              <div key={conv.id} className="group">
                 {editingConvId === conv.id ? (
-                  <form 
+                  <form
                     onSubmit={handleRename}
                     className="flex w-full items-center gap-1 rounded-lg bg-sidebar-accent px-2 py-1"
                   >
@@ -766,13 +794,13 @@ export default function ChatPage() {
                       autoFocus
                       value={editingTitle}
                       onChange={(e) => setEditingTitle(e.target.value)}
-                      className="h-8 flex-1 border-none bg-transparent px-1 text-sm focus-visible:ring-0"
+                      className="h-8 flex-1 rounded border border-input bg-white px-2 text-sm text-black focus-visible:ring-1 focus-visible:ring-primary"
                     />
                     <Button
                       type="submit"
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 text-green-500 hover:bg-green-500/10"
+                      className="h-7 w-7 shrink-0 text-green-500 hover:bg-green-500/10"
                     >
                       <SaveIcon className="h-3.5 w-3.5" />
                     </Button>
@@ -780,7 +808,7 @@ export default function ChatPage() {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 text-red-500 hover:bg-red-500/10"
+                      className="h-7 w-7 shrink-0 text-red-500 hover:bg-red-500/10"
                       onClick={(e) => {
                         e.stopPropagation()
                         setEditingConvId(null)
@@ -790,38 +818,35 @@ export default function ChatPage() {
                     </Button>
                   </form>
                 ) : (
-                  <div className="flex w-full items-center relative">
-                    <button
-                      onClick={() => loadConversation(conv.id)}
-                      className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors ${currentConvId === conv.id
-                          ? "bg-sidebar-accent text-sidebar-foreground pr-16"
-                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground pr-16"
-                        }`}
-                    >
-                      <MessageSquare className="h-4 w-4 shrink-0 opacity-70" />
-                      <span className="truncate text-left">{conv.title}</span>
-                    </button>
-                    
+                  <div
+                    onClick={() => loadConversation(conv.id)}
+                    className={cn(
+                      "flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors",
+                      currentConvId === conv.id
+                        ? "bg-sidebar-accent text-sidebar-foreground"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                    )}
+                  >
+                    <MessageSquare className="h-4 w-4 shrink-0 opacity-70" />
+                    <span className="flex-1 min-w-0 truncate text-left">{conv.title}</span>
                     <div className={cn(
-                      "absolute right-2 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100",
+                      "flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100",
                       currentConvId === conv.id && "opacity-100"
                     )}>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                      <button
+                        className="flex h-7 w-7 items-center justify-center rounded text-sidebar-foreground/50 hover:bg-sidebar-border hover:text-sidebar-foreground"
                         onClick={(e) => startRename(e, conv)}
+                        title="Rename"
                       >
                         <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-sidebar-foreground/50 hover:bg-red-500/10 hover:text-red-500"
+                      </button>
+                      <button
+                        className="flex h-7 w-7 items-center justify-center rounded text-sidebar-foreground/50 hover:bg-red-500/10 hover:text-red-500"
                         onClick={(e) => handleDeleteConversation(e, conv.id)}
+                        title="Delete"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      </button>
                     </div>
                   </div>
                 )}
@@ -829,7 +854,7 @@ export default function ChatPage() {
             ))
           ) : (
             <p className="py-8 text-center text-sm text-sidebar-foreground/40">
-              {t("chat.no_conversations")}
+              {searchQuery ? "No chats match your search" : t("chat.no_conversations")}
             </p>
           )}
         </div>

@@ -19,7 +19,7 @@ if not django.conf.settings.configured:
 
 from accounts.models import FarmerProfile
 from chat.models import Conversation, Message
-from utils.gemini_api import ask_gemini, analyze_plant_image, model
+from utils.gemini_api import ask_gemini, analyze_plant_image, respond_to_voice
 from utils.weather_api import get_forecast_by_city
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
@@ -1139,25 +1139,20 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("🎧 Listening to your voice message...")
             await update.message.chat.send_action("record_voice")
             
-            # Upload to Gemini
+            # Upload to Gemini and respond
             try:
-                # For simplicity, we'll use genai.upload_file
-                import google.generativeai as genai
                 mime_type = "audio/ogg"
-                audio_part = genai.upload_file(path=tmp_path, mime_type=mime_type)
-                
-                # 1. Sync User part
+
+                # 1. Save user turn
                 conv = await sync_to_async(db_get_or_create_conv)(user)
                 await sync_to_async(db_save_msg)(conv, 'user', "[Sent a voice note]")
-                
-                # 2. Ask Gemini
-                prompt = f"Listen to this audio and respond in {lang} language. Personalize for a Nigerian farmer."
-                response = model.generate_content([prompt, audio_part])
-                response_text = response.text.strip()
-                
-                # 3. Save Assistant reply
+
+                # 2. Ask Gemini to listen and respond
+                response_text = await sync_to_async(respond_to_voice)(tmp_path, mime_type, lang)
+
+                # 3. Save assistant reply
                 await sync_to_async(db_save_msg)(conv, 'assistant', response_text)
-                
+
                 # 4. Reply
                 await update.message.reply_text(response_text, parse_mode='Markdown')
             finally:
@@ -1416,22 +1411,29 @@ def run_bot():
     application.add_handler(voice_handler)
     
     import time
-    max_retries = 5
-    retry_delay = 5
-    
+    from telegram.error import Conflict
+
+    max_retries = 8
     for attempt in range(max_retries):
         try:
-            print(f"FarmBuddy Bot is polling (Attempt {attempt + 1})...", flush=True)
-            # Connectivity confirmed in previous diagnostic run
-            application.run_polling(close_loop=False)
+            print(f"FarmBuddy Bot starting (attempt {attempt + 1})...", flush=True)
+            application.run_polling(
+                close_loop=False,
+                drop_pending_updates=True,   # discard stale updates from previous instance
+            )
             break
+        except Conflict:
+            # Another instance (previous deploy) is still polling — wait for it to shut down
+            wait = min(10 * (attempt + 1), 60)
+            print(f"Conflict: another instance is running. Waiting {wait}s before retry...", flush=True)
+            time.sleep(wait)
         except Exception as e:
-            print(f"Bot encountered an error: {e}")
+            wait = 5
+            print(f"Bot error: {e}. Retrying in {wait}s...", flush=True)
             if attempt < max_retries - 1:
-                print(f"Retrying in {retry_delay} seconds...")
-                time.sleep(retry_delay)
+                time.sleep(wait)
             else:
-                print("Max retries reached. Bot is shutting down.")
+                print("Max retries reached. Bot shutting down.", flush=True)
 
 if __name__ == '__main__':
     run_bot()

@@ -1,62 +1,75 @@
 import os
-import google.generativeai as genai
-from dotenv import load_dotenv
+import io
 import requests
+from dotenv import load_dotenv
 from utils.weather_api import check_weather_for_ai
 
 load_dotenv(override=True)
 
-# Support both GOOGLE_API_KEY (preferred) and GEMINI_API_KEY (legacy) env var names
+from google import genai
+from google.genai import types
+
 _api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 if not _api_key:
     raise EnvironmentError(
         "Missing Gemini API key. Set GOOGLE_API_KEY in your .env file."
     )
-genai.configure(api_key=_api_key)
 
-# System instruction for the persona
+client = genai.Client(api_key=_api_key)
+
 SYSTEM_INSTRUCTION = """
-You are FarmBuddy, an expert agricultural advisor for Nigerian smallholder farmers. 
+You are FarmBuddy, an expert agricultural advisor for Nigerian smallholder farmers.
 Your goal is to provide accurate, practical, and easy-to-understand farming advice.
 - Prioritize organic and cost-effective solutions.
 - Use simple English.
 - If you don't know the answer, admit it and suggest consulting a local extension agent.
 """
 
-model = genai.GenerativeModel(
-    "gemini-flash-latest",
-    system_instruction=SYSTEM_INSTRUCTION,
-    tools=[check_weather_for_ai]
-)
+_CHAT_MODEL = "gemini-2.0-flash"
+_VISION_MODEL = "gemini-2.0-flash"
 
-# Load Hugging Face API key from environment variables
-# HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
+# Explicit tool declaration for weather function calling
+_weather_tool = types.Tool(function_declarations=[
+    types.FunctionDeclaration(
+        name="check_weather_for_ai",
+        description="Get current weather conditions and 5-day forecast for a Nigerian city",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "city_name": types.Schema(
+                    type="STRING",
+                    description="Name of the city or town"
+                )
+            },
+            required=["city_name"]
+        )
+    )
+])
 
-# Hugging Face Inference API URL for N-ATLaS
-# API_URL = "https://api-inference.huggingface.co/models/NCAIR1/N-ATLaS"
-
-# Load YarnGPT API key from environment variables
 YARNGPT_API_KEY = os.getenv("YARNGPT_API_KEY")
-
-# YarnGPT API URL
 YARNGPT_API_URL = "https://yarngpt.ai/api/v1/tts"
 
+
+def _build_history(messages: list) -> list:
+    history = []
+    for msg in messages:
+        role = "user" if msg["role"] == "user" else "model"
+        history.append(types.Content(
+            role=role,
+            parts=[types.Part(text=msg["content"])]
+        ))
+    return history
+
+
 def ask_gemini(messages_history: list, weather_context=None, profile_context=None, stream=False, language='en'):
-    """
-    Sends the full conversation history to Gemini.
-    stream: If True, returns a generator for streaming responses.
-    language: Target language for the response ('en', 'ha', 'ig', 'yo').
-    profile_context: Optional string containing user profile info.
-    """
-    # Verify input — always return a generator when stream=True to keep the caller contract
+    """Send conversation history to Gemini and return a text response or generator."""
     if not messages_history:
         if stream:
-            def _empty_gen():
+            def _empty():
                 yield "Hello! How can I help you with farming today?"
-            return _empty_gen()
+            return _empty()
         return "Hello! How can I help you with farming today?"
 
-    # Language instruction mapping
     lang_instructions = {
         'en': "Answer in English.",
         'ha': "Answer in Hausa language (Harshen Hausa).",
@@ -65,107 +78,90 @@ def ask_gemini(messages_history: list, weather_context=None, profile_context=Non
     }
     lang_instruction = lang_instructions.get(language, "Answer in English.")
 
-    # Convert Streamlit roles to Gemini roles
-    gemini_history = []
-    
-    # Process messages, limit to last 10 to improve speed
-    recent_messages = messages_history[-10:] if len(messages_history) > 10 else messages_history
-    
-    # Process all messages except the last one
-    for msg in recent_messages[:-1]:
-        role = "user" if msg["role"] == "user" else "model"
-        gemini_history.append({"role": role, "parts": [msg["content"]]})
-    
-    # Start chat
-    chat = model.start_chat(history=gemini_history)
-    
-    # Last message
-    last_message = recent_messages[-1]["content"]
-    
-    # Add current date to context to prevent hallucinations
+    recent = messages_history[-10:]
+    history = _build_history(recent[:-1])
+
     from datetime import datetime
     current_date = datetime.now().strftime("%A, %B %d, %Y")
-    
     system_context = f"Current Date: {current_date}\nIMPORTANT INSTRUCTION: {lang_instruction}"
-    
     if profile_context:
         system_context += f"\nUser Profile:\n{profile_context}"
-        
     if weather_context:
         system_context += f"\nWeather Info: {weather_context}"
-        
-    last_message = f"[System Context: {system_context}]\n\n{last_message}"
-        
+
+    last_message = f"[System Context: {system_context}]\n\n{recent[-1]['content']}"
+
+    config = types.GenerateContentConfig(
+        system_instruction=SYSTEM_INSTRUCTION,
+        tools=[_weather_tool],
+    )
+
     try:
-        response = chat.send_message(last_message, stream=stream)
-        
+        chat = client.chats.create(model=_CHAT_MODEL, history=history, config=config)
+
         if stream:
             def stream_generator():
                 try:
                     fn_call = None
-                    for chunk in response:
-                        if chunk.parts and chunk.parts[0].function_call:
-                            fn_call = chunk.parts[0].function_call
+                    for chunk in chat.send_message_stream(last_message):
+                        if chunk.function_calls:
+                            fn_call = chunk.function_calls[0]
                             if fn_call.name == "check_weather_for_ai":
-                                yield f"[Status: Gathering weather info for {fn_call.args.get('city_name', 'your location')}...]\n\n"
-                            break  # Exit first stream before sending function response
+                                city = fn_call.args.get('city_name', 'your location')
+                                yield f"[Status: Gathering weather info for {city}...]\n\n"
+                            break
                         elif chunk.text:
                             yield chunk.text
 
                     if fn_call and fn_call.name == "check_weather_for_ai":
-                        args = {key: val for key, val in fn_call.args.items()}
-                        weather_result = check_weather_for_ai(**args)
-                        func_response = genai.protos.Part(
-                            function_response=genai.protos.FunctionResponse(
+                        weather_result = check_weather_for_ai(**dict(fn_call.args))
+                        func_part = types.Part(
+                            function_response=types.FunctionResponse(
                                 name=fn_call.name,
                                 response={"result": weather_result}
                             )
                         )
-                        follow_up = chat.send_message(func_response, stream=True)
-                        for text_chunk in follow_up:
+                        for text_chunk in chat.send_message_stream(func_part):
                             if text_chunk.text:
                                 yield text_chunk.text
                 except Exception as e:
                     print(f"Error during streaming: {e}")
-                    yield f"\n[Sorry, I encountered an error. Please try again.]"
+                    yield "\n[Sorry, I encountered an error. Please try again.]"
             return stream_generator()
         else:
-            if response.parts and response.parts[0].function_call:
-                fn = response.parts[0].function_call
+            response = chat.send_message(last_message)
+            if response.function_calls:
+                fn = response.function_calls[0]
                 if fn.name == "check_weather_for_ai":
-                    args = {key: val for key, val in fn.args.items()}
-                    weather_result = check_weather_for_ai(**args)
-                    func_response = genai.protos.Part(
-                        function_response=genai.protos.FunctionResponse(
-                            name=fn.name, 
+                    weather_result = check_weather_for_ai(**dict(fn.args))
+                    func_part = types.Part(
+                        function_response=types.FunctionResponse(
+                            name=fn.name,
                             response={"result": weather_result}
                         )
                     )
-                    follow_up_response = chat.send_message(func_response, stream=False)
-                    return follow_up_response.text
+                    return chat.send_message(func_part).text
             return response.text
     except Exception as e:
         error_msg = str(e)
         if stream:
-            def error_gen(): yield f"An error occurred: {error_msg}"
-            return error_gen()
+            def _err():
+                yield f"An error occurred: {error_msg}"
+            return _err()
         return f"An error occurred: {error_msg}"
 
 
 def analyze_plant_image(image_path, system_context=None, stream=False):
-    """
-    Analyze a plant image for disease detection using Gemini Vision
-    image_path: Path to the uploaded plant image
-    system_context: Optional string containing user profile and history info
-    stream: If True, returns a generator
-    """
+    """Analyze a plant leaf image for disease detection using Gemini Vision."""
     from PIL import Image
-    
     try:
-        # Load the image
         img = Image.open(image_path)
-        
-        # Create prompt for plant disease analysis
+        buf = io.BytesIO()
+        img.save(buf, format='JPEG')
+        image_part = types.Part(
+            inline_data=types.Blob(data=buf.getvalue(), mime_type='image/jpeg')
+        )
+
         base_prompt = """Analyze this plant leaf image and provide:
 1. **Disease Identification**: What disease or problem do you see? (if any)
 2. **Confidence Level**: How confident are you in this diagnosis?
@@ -176,17 +172,15 @@ def analyze_plant_image(image_path, system_context=None, stream=False):
 
 Use simple English and be practical. If you cannot identify a specific disease, explain what you observe and suggest consulting a local agricultural extension agent."""
 
-        if system_context:
-            prompt = f"{system_context}\n\n[TASK]: {base_prompt}"
-        else:
-            prompt = base_prompt
+        prompt = f"{system_context}\n\n[TASK]: {base_prompt}" if system_context else base_prompt
 
-        response = model.generate_content([prompt, img], stream=stream)
-        
         if stream:
             def stream_generator():
                 try:
-                    for chunk in response:
+                    for chunk in client.models.generate_content_stream(
+                        model=_VISION_MODEL,
+                        contents=[prompt, image_part]
+                    ):
                         if chunk.text:
                             yield chunk.text
                 except Exception as e:
@@ -194,62 +188,128 @@ Use simple English and be practical. If you cannot identify a specific disease, 
                     yield " [Error: Interrupted] "
             return stream_generator()
         else:
+            response = client.models.generate_content(
+                model=_VISION_MODEL,
+                contents=[prompt, image_part]
+            )
             return response.text.strip()
-        
     except Exception as e:
         if stream:
-            def error_gen(): yield f"Error analyzing image: {str(e)}"
-            return error_gen()
+            def _err():
+                yield f"Error analyzing image: {str(e)}"
+            return _err()
         return f"Error analyzing image: {str(e)}"
 
 
-def summarize_title(text):
-    """
-    Generate a short 5-word summary title for a conversation based on the first prompt
-    """
+def summarize_title(text: str) -> str:
+    """Generate a short 5-word summary title for a conversation."""
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        # Use simple model for summarization
-        prompt = f"Summarize the following text into a short title of maximum 5 words. Do not use quotes or special characters. Text: {text}"
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model=_CHAT_MODEL,
+            contents=f"Summarize the following text into a short title of maximum 5 words. Do not use quotes or special characters. Text: {text}"
+        )
         return response.text.strip().replace('"', '').replace('*', '')
     except Exception as e:
-        print(f"Error generating title: {str(e)}")
-        # Fallback to truncation if AI fails
+        print(f"Error generating title: {e}")
         return text[:30] + "..." if len(text) > 30 else text
 
-# Function to generate speech using YarnGPT
+
+def transcribe_audio_file(file_path: str, mime_type: str, language: str = "en") -> str:
+    """Upload an audio file to Gemini Files API and return the transcription text."""
+    import time
+    file_ref = client.files.upload(
+        path=file_path,
+        config=types.UploadFileConfig(mime_type=mime_type, display_name="audio")
+    )
+    max_wait = 30
+    waited = 0
+    while file_ref.state.name == "PROCESSING" and waited < max_wait:
+        time.sleep(1)
+        waited += 1
+        file_ref = client.files.get(name=file_ref.name)
+
+    if file_ref.state.name != "ACTIVE":
+        raise Exception(f"File {file_ref.name} is not ACTIVE (state: {file_ref.state.name})")
+
+    language_names = {'en': 'English', 'ha': 'Hausa', 'ig': 'Igbo', 'yo': 'Yoruba'}
+    lang_name = language_names.get(language, 'English')
+    prompt = (
+        f"Transcribe this audio exactly as spoken. "
+        f"The language is {lang_name}. "
+        "Return ONLY the transcription text, nothing else."
+    )
+
+    response = client.models.generate_content(
+        model=_VISION_MODEL,
+        contents=[
+            types.Content(parts=[
+                types.Part(file_data=types.FileData(
+                    file_uri=file_ref.uri,
+                    mime_type=file_ref.mime_type
+                )),
+                types.Part(text=prompt)
+            ])
+        ]
+    )
+    try:
+        client.files.delete(name=file_ref.name)
+    except Exception:
+        pass
+    return response.text.strip()
+
+
+def respond_to_voice(file_path: str, mime_type: str, language: str = "en") -> str:
+    """Upload a voice note and ask Gemini to both understand and respond (used by Telegram bot)."""
+    import time
+    file_ref = client.files.upload(
+        path=file_path,
+        config=types.UploadFileConfig(mime_type=mime_type, display_name="voice_note")
+    )
+    max_wait = 30
+    waited = 0
+    while file_ref.state.name == "PROCESSING" and waited < max_wait:
+        time.sleep(1)
+        waited += 1
+        file_ref = client.files.get(name=file_ref.name)
+
+    if file_ref.state.name != "ACTIVE":
+        raise Exception(f"Voice file is not ACTIVE (state: {file_ref.state.name})")
+
+    prompt = (
+        f"Listen to this audio and respond helpfully in {language} language. "
+        "Personalize your response for a Nigerian smallholder farmer."
+    )
+
+    response = client.models.generate_content(
+        model=_VISION_MODEL,
+        contents=[
+            types.Content(parts=[
+                types.Part(file_data=types.FileData(
+                    file_uri=file_ref.uri,
+                    mime_type=file_ref.mime_type
+                )),
+                types.Part(text=prompt)
+            ])
+        ]
+    )
+    try:
+        client.files.delete(name=file_ref.name)
+    except Exception:
+        pass
+    return response.text.strip()
+
+
 def text_to_speech(text, voice="Idera"):
-    API_URL = "https://yarngpt.ai/api/v1/tts"
-    headers = {
-        "Authorization": f"Bearer {YARNGPT_API_KEY}"
-    }
-    payload = {
-        "text": text,
-        "voice": voice
-    }
-
-    response = requests.post(API_URL, headers=headers, json=payload, stream=True)
-
+    headers = {"Authorization": f"Bearer {YARNGPT_API_KEY}"}
+    response = requests.post(
+        YARNGPT_API_URL,
+        headers=headers,
+        json={"text": text, "voice": voice},
+        stream=True
+    )
     if response.status_code == 200:
         with open("output.mp3", "wb") as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
-        print("Audio file saved as output.mp3")
     else:
-        print(f"Error: {response.status_code}")
-        print(response.json())
-
-# Function to transcribe speech using YarnGPT
-def speech_to_text(audio_file, language="en"):
-    headers = {
-        "Authorization": f"Bearer {YARNGPT_API_KEY}",
-    }
-    with open(audio_file, "rb") as f:
-        files = {"file": f}
-        response = requests.post(f"{YARNGPT_API_URL}/stt", headers=headers, files=files, params={"language": language})
-    if response.status_code == 200:
-        print("Transcription:", response.json()["text"])
-    else:
-        print("Error:", response.json())
-
+        print(f"TTS Error {response.status_code}:", response.json())

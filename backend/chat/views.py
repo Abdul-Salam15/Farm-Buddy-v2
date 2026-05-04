@@ -509,8 +509,7 @@ def get_weather_data(request):
 def transcribe_audio(request):
     """Transcribe audio using Gemini Files API with ACTIVE-state polling for reliability."""
     import tempfile
-    import time
-    import google.generativeai as genai
+    from utils.gemini_api import transcribe_audio_file
 
     try:
         if 'audio' not in request.FILES:
@@ -524,12 +523,6 @@ def transcribe_audio(request):
         if language not in ['en', 'ha', 'ig', 'yo']:
             language = 'en'
 
-        api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            return JsonResponse({'success': False, 'error': 'Gemini API key not configured.'}, status=500)
-
-        genai.configure(api_key=api_key)
-
         content_type = getattr(audio_file_obj, 'content_type', '') or 'audio/webm'
         if 'ogg' in content_type:
             ext, mime_type = '.ogg', 'audio/ogg'
@@ -541,50 +534,19 @@ def transcribe_audio(request):
             ext, mime_type = '.webm', 'audio/webm'
 
         audio_bytes = b''.join(audio_file_obj.chunks())
-
         tmp_path = None
-        uploaded = None
         try:
             with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
                 tmp.write(audio_bytes)
                 tmp_path = tmp.name
 
-            # Upload to Gemini Files API
-            uploaded = genai.upload_file(path=tmp_path, mime_type=mime_type)
-
-            # Poll until ACTIVE — Gemini processes files asynchronously
-            max_wait = 30
-            waited = 0
-            while uploaded.state.name == "PROCESSING" and waited < max_wait:
-                time.sleep(1)
-                waited += 1
-                uploaded = genai.get_file(uploaded.name)
-
-            if uploaded.state.name != "ACTIVE":
-                raise Exception(f"File upload did not become ACTIVE (state: {uploaded.state.name})")
-
-            language_names = {'en': 'English', 'ha': 'Hausa', 'ig': 'Igbo', 'yo': 'Yoruba'}
-            lang_name = language_names.get(language, 'English')
-            prompt = (
-                f"Transcribe this audio exactly as spoken. "
-                f"The language is {lang_name}. "
-                "Return ONLY the transcription text, nothing else."
-            )
-
-            model = genai.GenerativeModel("gemini-2.0-flash")
-            response = model.generate_content([uploaded, prompt])
-            text = response.text.strip()
+            text = transcribe_audio_file(tmp_path, mime_type, language)
             return JsonResponse({'success': True, 'text': text})
 
         finally:
             if tmp_path:
                 try:
                     os.unlink(tmp_path)
-                except Exception:
-                    pass
-            if uploaded:
-                try:
-                    genai.delete_file(uploaded.name)
                 except Exception:
                     pass
 

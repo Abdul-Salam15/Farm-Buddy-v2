@@ -845,16 +845,12 @@ export default function ChatPage() {
                       <span className="min-w-0 flex-1 truncate">{conv.title}</span>
                     </button>
 
-                    {/* ··· menu — absolutely positioned so it never displaces the title */}
-                    <div className={cn(
-                      "absolute right-1 top-1/2 -translate-y-1/2 transition-opacity",
-                      "opacity-0 group-hover:opacity-100",
-                      currentConvId === conv.id && "opacity-100"
-                    )}>
+                    {/* ··· menu — always visible, absolutely positioned so title never touches it */}
+                    <div className="absolute right-1 top-1/2 -translate-y-1/2">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
-                            className="flex h-7 w-7 items-center justify-center rounded text-zinc-400 hover:bg-white/10 hover:text-white transition-colors"
+                            className="flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:bg-white/10 hover:text-zinc-200 transition-colors"
                             onClick={(e) => e.stopPropagation()}
                             title="More options"
                           >

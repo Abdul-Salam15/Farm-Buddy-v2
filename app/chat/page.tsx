@@ -7,6 +7,12 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   Send,
   Plus,
   MessageSquare,
@@ -33,7 +39,8 @@ import {
   Trash2,
   Check as SaveIcon,
   ArrowDown,
-  Search
+  Search,
+  MoreHorizontal
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
@@ -784,7 +791,7 @@ export default function ChatPage() {
         <div className="space-y-1">
           {filteredConversations.length > 0 ? (
             filteredConversations.map((conv) => (
-              <div key={conv.id} className="group">
+              <div key={conv.id} className="group relative">
                 {editingConvId === conv.id ? (
                   <form
                     onSubmit={handleRename}
@@ -819,41 +826,61 @@ export default function ChatPage() {
                   </form>
                 ) : (
                   <div className={cn(
-                    "flex w-full items-center rounded-lg text-sm transition-colors",
+                    "relative flex w-full items-center overflow-hidden rounded-lg text-sm transition-colors",
                     currentConvId === conv.id
                       ? "bg-sidebar-accent"
                       : "hover:bg-sidebar-accent/50"
                   )}>
-                    {/* Clickable title area — takes all available space, truncates */}
+                    {/* Clickable title — fills row, truncates, leaves room for ··· button */}
                     <button
                       onClick={() => loadConversation(conv.id)}
                       className={cn(
-                        "flex min-w-0 flex-1 items-center gap-2 py-2.5 pl-3 pr-1",
+                        "flex min-w-0 flex-1 items-center gap-2 py-2.5 pl-3 pr-9 text-left",
                         currentConvId === conv.id
                           ? "text-sidebar-foreground"
-                          : "text-sidebar-foreground/70 hover:text-sidebar-foreground"
+                          : "text-sidebar-foreground/70"
                       )}
                     >
-                      <MessageSquare className="h-4 w-4 shrink-0 opacity-70" />
-                      <span className="min-w-0 flex-1 truncate text-left">{conv.title}</span>
+                      <MessageSquare className="h-4 w-4 shrink-0 opacity-60" />
+                      <span className="min-w-0 flex-1 truncate">{conv.title}</span>
                     </button>
 
-                    {/* Action icons — always visible, never inside the overflow area */}
-                    <div className="flex shrink-0 items-center gap-0 pr-1">
-                      <button
-                        className="flex h-8 w-8 items-center justify-center rounded text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
-                        onClick={(e) => startRename(e, conv)}
-                        title="Rename"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        className="flex h-8 w-8 items-center justify-center rounded text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                        onClick={(e) => handleDeleteConversation(e, conv.id)}
-                        title="Delete"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                    {/* ··· menu — absolutely positioned so it never displaces the title */}
+                    <div className={cn(
+                      "absolute right-1 top-1/2 -translate-y-1/2 transition-opacity",
+                      "opacity-0 group-hover:opacity-100",
+                      currentConvId === conv.id && "opacity-100"
+                    )}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            className="flex h-7 w-7 items-center justify-center rounded text-zinc-400 hover:bg-white/10 hover:text-white transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                            title="More options"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent side="right" align="start" className="w-40">
+                          <DropdownMenuItem
+                            className="gap-2 cursor-pointer"
+                            onSelect={() => {
+                              setEditingConvId(conv.id)
+                              setEditingTitle(conv.title)
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Rename
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="gap-2 cursor-pointer text-red-500 focus:text-red-500"
+                            onSelect={(e) => handleDeleteConversation(e as any, conv.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 )}

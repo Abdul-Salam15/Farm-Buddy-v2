@@ -821,27 +821,24 @@ export default function ChatPage() {
                   <div
                     onClick={() => loadConversation(conv.id)}
                     className={cn(
-                      "flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors",
+                      "flex w-full cursor-pointer items-center gap-1 rounded-lg px-3 py-2.5 text-sm transition-colors",
                       currentConvId === conv.id
                         ? "bg-sidebar-accent text-sidebar-foreground"
                         : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
                     )}
                   >
                     <MessageSquare className="h-4 w-4 shrink-0 opacity-70" />
-                    <span className="flex-1 min-w-0 truncate text-left">{conv.title}</span>
-                    <div className={cn(
-                      "flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100",
-                      currentConvId === conv.id && "opacity-100"
-                    )}>
+                    <span className="flex-1 min-w-0 truncate text-left pl-1">{conv.title}</span>
+                    <div className="flex shrink-0 items-center gap-0.5 ml-1">
                       <button
-                        className="flex h-7 w-7 items-center justify-center rounded text-sidebar-foreground/50 hover:bg-sidebar-border hover:text-sidebar-foreground"
+                        className="flex h-7 w-7 items-center justify-center rounded text-sidebar-foreground/40 hover:bg-sidebar-border hover:text-sidebar-foreground transition-colors"
                         onClick={(e) => startRename(e, conv)}
                         title="Rename"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
                       <button
-                        className="flex h-7 w-7 items-center justify-center rounded text-sidebar-foreground/50 hover:bg-red-500/10 hover:text-red-500"
+                        className="flex h-7 w-7 items-center justify-center rounded text-sidebar-foreground/40 hover:bg-red-500/10 hover:text-red-500 transition-colors"
                         onClick={(e) => handleDeleteConversation(e, conv.id)}
                         title="Delete"
                       >

@@ -26,18 +26,18 @@ The core Python dependencies installed for the backend are itemised in Table 4.1
 
 | Package | Version | Purpose |
 |---|---|---|
-| Django | 6.0 | Web framework and ORM |
-| google-generativeai | Latest | Gemini AI API integration |
-| python-telegram-bot | Latest | Telegram bot framework |
-| psycopg2-binary | Latest | PostgreSQL database adapter |
-| Pillow | Latest | Image processing and compression |
-| gunicorn | Latest | Production WSGI application server |
-| whitenoise | Latest | Static file serving in production |
-| django-cors-headers | Latest | Cross-origin resource sharing |
-| django-jazzmin | Latest | Enhanced Django admin interface |
-| matplotlib | Latest | Weather forecast chart generation |
-| requests | Latest | HTTP client for external APIs |
-| python-dotenv | Latest | Environment variable management |
+| Django | 6.0.4 | Web framework and ORM |
+| google-generativeai | 0.8.6 | Gemini AI API integration |
+| python-telegram-bot | 22.7 | Telegram bot framework |
+| psycopg2-binary | 2.9.12 | PostgreSQL database adapter |
+| Pillow | 12.2.0 | Image processing and compression |
+| gunicorn | 25.3.0 | Production WSGI application server |
+| whitenoise | 6.12.0 | Static file serving in production |
+| django-cors-headers | 4.9.0 | Cross-origin resource sharing |
+| django-jazzmin | 3.0.4 | Enhanced Django admin interface |
+| matplotlib | 3.10.9 | Weather forecast chart generation |
+| requests | 2.33.1 | HTTP client for external APIs |
+| python-dotenv | 1.2.2 | Environment variable management |
 
 Environment variables were stored in a `.env` file at the project root and loaded at runtime using `python-dotenv`. The required environment variables included the Google Gemini API key (`GOOGLE_API_KEY`), OpenWeatherMap API key (`OPENWEATHER_API_KEY`), YarnGPT API key (`YARNGPT_API_KEY`), and the Telegram bot token (`TELEGRAM_BOT_TOKEN`).
 

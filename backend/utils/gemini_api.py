@@ -31,13 +31,17 @@ _VISION_MODEL = "gemini-1.5-flash"
 
 def _friendly_error(e: Exception) -> str:
     msg = str(e)
-    if "429" in msg or "RESOURCE_EXHAUSTED" in msg or "quota" in msg.lower():
+    msg_lower = msg.lower()
+    # google-genai SDK wraps quota errors with these strings
+    quota_signals = ("429", "resource_exhausted", "quota", "ratelimit", "rate_limit",
+                     "generaterequests", "toomanyrequests", "too many requests", "retry_delay")
+    if any(s in msg_lower for s in quota_signals):
         return "FarmBuddy is currently busy due to high demand. Please wait a moment and try again."
-    if "400" in msg or "INVALID_ARGUMENT" in msg:
+    if "400" in msg or "invalid_argument" in msg_lower:
         return "I couldn't process that request. Please try rephrasing your message."
-    if "401" in msg or "403" in msg or "API_KEY" in msg:
+    if "401" in msg or "403" in msg or "api_key" in msg_lower:
         return "There's a configuration issue on our end. Please contact support."
-    if "503" in msg or "UNAVAILABLE" in msg:
+    if "503" in msg or "unavailable" in msg_lower:
         return "The AI service is temporarily unavailable. Please try again shortly."
     return "Something went wrong on my end. Please try again."
 

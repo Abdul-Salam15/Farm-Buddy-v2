@@ -1,5 +1,7 @@
 import os
 import io
+import json
+import base64
 import requests
 import logging
 from dotenv import load_dotenv
@@ -7,22 +9,15 @@ from utils.weather_api import check_weather_for_ai
 
 load_dotenv(override=True)
 
-from google import genai
-from google.genai import types
-try:
-    from google.genai import errors as genai_errors
-except ImportError:
-    genai_errors = None
+from openai import OpenAI, APIStatusError
 
 logger = logging.getLogger(__name__)
 
-_api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+_api_key = os.getenv("OPENAI_API_KEY")
 if not _api_key:
-    raise EnvironmentError(
-        "Missing Gemini API key. Set GOOGLE_API_KEY in your .env file."
-    )
+    raise EnvironmentError("Missing OpenAI API key. Set OPENAI_API_KEY in your .env file.")
 
-client = genai.Client(api_key=_api_key)
+client = OpenAI(api_key=_api_key)
 
 SYSTEM_INSTRUCTION = """
 You are FarmBuddy, an expert agricultural advisor for Nigerian smallholder farmers.
@@ -32,73 +27,64 @@ Your goal is to provide accurate, practical, and easy-to-understand farming advi
 - If you don't know the answer, admit it and suggest consulting a local extension agent.
 """
 
-_CHAT_MODEL = "gemini-1.5-flash"
-_VISION_MODEL = "gemini-1.5-flash"
+_CHAT_MODEL = "gpt-4o-mini"
+_VISION_MODEL = "gpt-4o"
 
-
-def _is_quota_error(e: Exception) -> bool:
-    # Check by exception type first (most reliable)
-    if genai_errors:
-        if isinstance(e, genai_errors.ClientError):
-            code = getattr(e, 'code', None) or getattr(e, 'status_code', None)
-            if code in (429, 503):
-                return True
-    # Fallback: string scan (case-insensitive)
-    msg = str(e).lower()
-    return any(s in msg for s in (
-        "429", "resource_exhausted", "quota", "rate_limit", "ratelimit",
-        "generaterequests", "too many requests", "retry_delay", "exhausted",
-    ))
-
-
-def _friendly_error(e: Exception) -> str:
-    logger.error("Gemini error [%s]: %s", type(e).__name__, e)
-    if _is_quota_error(e):
-        return "FarmBuddy is currently busy due to high demand. Please wait a moment and try again."
-    msg = str(e).lower()
-    if "invalid_argument" in msg or ("400" in msg and "quota" not in msg):
-        return "I couldn't process that request. Please try rephrasing your message."
-    if "401" in msg or "403" in msg or "api_key" in msg:
-        return "There's a configuration issue on our end. Please contact support."
-    if "503" in msg or "unavailable" in msg:
-        return "The AI service is temporarily unavailable. Please try again shortly."
-    return "Something went wrong on my end. Please try again."
-
-# Explicit tool declaration for weather function calling
-_weather_tool = types.Tool(function_declarations=[
-    types.FunctionDeclaration(
-        name="check_weather_for_ai",
-        description="Get current weather conditions and 5-day forecast for a Nigerian city",
-        parameters=types.Schema(
-            type="OBJECT",
-            properties={
-                "city_name": types.Schema(
-                    type="STRING",
-                    description="Name of the city or town"
-                )
-            },
-            required=["city_name"]
-        )
-    )
-])
+_weather_tool = [
+    {
+        "type": "function",
+        "function": {
+            "name": "check_weather_for_ai",
+            "description": "Get current weather conditions and 5-day forecast for a Nigerian city",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "city_name": {
+                        "type": "string",
+                        "description": "Name of the city or town"
+                    }
+                },
+                "required": ["city_name"]
+            }
+        }
+    }
+]
 
 YARNGPT_API_KEY = os.getenv("YARNGPT_API_KEY")
 YARNGPT_API_URL = "https://yarngpt.ai/api/v1/tts"
 
 
-def _build_history(messages: list) -> list:
-    history = []
-    for msg in messages:
-        role = "user" if msg["role"] == "user" else "model"
-        history.append(types.Content(
-            role=role,
-            parts=[types.Part(text=msg["content"])]
-        ))
-    return history
+def _friendly_error(e: Exception) -> str:
+    logger.error("OpenAI error [%s]: %s", type(e).__name__, e)
+    if isinstance(e, APIStatusError):
+        if e.status_code == 429:
+            return "FarmBuddy is currently busy due to high demand. Please wait a moment and try again."
+        if e.status_code in (401, 403):
+            return "There's a configuration issue on our end. Please contact support."
+        if e.status_code == 400:
+            return "I couldn't process that request. Please try rephrasing your message."
+        if e.status_code >= 500:
+            return "The AI service is temporarily unavailable. Please try again shortly."
+    # Fallback string scan for anything not an APIStatusError
+    msg = str(e).lower()
+    if any(s in msg for s in ("429", "rate_limit", "quota", "too many requests")):
+        return "FarmBuddy is currently busy due to high demand. Please wait a moment and try again."
+    return "Something went wrong on my end. Please try again."
+
+
+def _build_messages(messages_history: list, system_extra: str = "") -> list:
+    system = SYSTEM_INSTRUCTION.strip()
+    if system_extra:
+        system += f"\n\n{system_extra}"
+    result = [{"role": "system", "content": system}]
+    for msg in messages_history:
+        role = "user" if msg["role"] == "user" else "assistant"
+        result.append({"role": role, "content": msg["content"]})
+    return result
 
 
 def ask_gemini(messages_history: list, weather_context=None, profile_context=None, stream=False, language='en'):
-    """Send conversation history to Gemini and return a text response or generator."""
+    """Send conversation history to OpenAI and return a text response or generator."""
     if not messages_history:
         if stream:
             def _empty():
@@ -114,90 +100,132 @@ def ask_gemini(messages_history: list, weather_context=None, profile_context=Non
     }
     lang_instruction = lang_instructions.get(language, "Answer in English.")
 
-    recent = messages_history[-10:]
-    history = _build_history(recent[:-1])
-
     from datetime import datetime
     current_date = datetime.now().strftime("%A, %B %d, %Y")
-    system_context = f"Current Date: {current_date}\nIMPORTANT INSTRUCTION: {lang_instruction}"
+    system_extra = f"Current Date: {current_date}\nIMPORTANT INSTRUCTION: {lang_instruction}"
     if profile_context:
-        system_context += f"\nUser Profile:\n{profile_context}"
+        system_extra += f"\nUser Profile:\n{profile_context}"
     if weather_context:
-        system_context += f"\nWeather Info: {weather_context}"
+        system_extra += f"\nWeather Info: {weather_context}"
 
-    last_message = f"[System Context: {system_context}]\n\n{recent[-1]['content']}"
-
-    config = types.GenerateContentConfig(
-        system_instruction=SYSTEM_INSTRUCTION,
-        tools=[_weather_tool],
-    )
+    recent = messages_history[-10:]
+    messages = _build_messages(recent, system_extra)
 
     try:
-        chat = client.chats.create(model=_CHAT_MODEL, history=history, config=config)
-
         if stream:
             def stream_generator():
                 try:
-                    fn_call = None
-                    for chunk in chat.send_message_stream(last_message):
-                        if chunk.function_calls:
-                            fn_call = chunk.function_calls[0]
-                            if fn_call.name == "check_weather_for_ai":
-                                city = fn_call.args.get('city_name', 'your location')
-                                yield f"[Status: Gathering weather info for {city}...]\n\n"
-                            break
-                        elif chunk.text:
-                            yield chunk.text
-
-                    if fn_call and fn_call.name == "check_weather_for_ai":
-                        weather_result = check_weather_for_ai(**dict(fn_call.args))
-                        func_part = types.Part(
-                            function_response=types.FunctionResponse(
-                                name=fn_call.name,
-                                response={"result": weather_result}
-                            )
-                        )
-                        for text_chunk in chat.send_message_stream(func_part):
-                            if text_chunk.text:
-                                yield text_chunk.text
-                except Exception as e:
-                    print(f"Error during streaming: {e}")
-                    yield f"\n{_friendly_error(e)}"
-            return stream_generator()
-        else:
-            response = chat.send_message(last_message)
-            if response.function_calls:
-                fn = response.function_calls[0]
-                if fn.name == "check_weather_for_ai":
-                    weather_result = check_weather_for_ai(**dict(fn.args))
-                    func_part = types.Part(
-                        function_response=types.FunctionResponse(
-                            name=fn.name,
-                            response={"result": weather_result}
-                        )
+                    response = client.chat.completions.create(
+                        model=_CHAT_MODEL,
+                        messages=messages,
+                        tools=_weather_tool,
+                        stream=True,
                     )
-                    return chat.send_message(func_part).text
-            return response.text
+
+                    # Accumulate tool calls while streaming content
+                    tool_calls_acc = {}
+                    for chunk in response:
+                        if not chunk.choices:
+                            continue
+                        delta = chunk.choices[0].delta
+                        if delta.tool_calls:
+                            for tc in delta.tool_calls:
+                                i = tc.index
+                                if i not in tool_calls_acc:
+                                    tool_calls_acc[i] = {"id": "", "name": "", "arguments": ""}
+                                if tc.id:
+                                    tool_calls_acc[i]["id"] += tc.id
+                                if tc.function:
+                                    if tc.function.name:
+                                        tool_calls_acc[i]["name"] += tc.function.name
+                                    if tc.function.arguments:
+                                        tool_calls_acc[i]["arguments"] += tc.function.arguments
+                        elif delta.content:
+                            yield delta.content
+
+                    # Resolve any tool calls and stream follow-up
+                    for tc in tool_calls_acc.values():
+                        if tc["name"] == "check_weather_for_ai":
+                            args = json.loads(tc["arguments"])
+                            city = args.get("city_name", "your location")
+                            yield f"[Status: Gathering weather info for {city}...]\n\n"
+                            weather_result = check_weather_for_ai(**args)
+                            follow_up = messages + [
+                                {
+                                    "role": "assistant",
+                                    "content": None,
+                                    "tool_calls": [{"id": tc["id"], "type": "function",
+                                                    "function": {"name": tc["name"], "arguments": tc["arguments"]}}]
+                                },
+                                {
+                                    "role": "tool",
+                                    "tool_call_id": tc["id"],
+                                    "content": json.dumps({"result": weather_result})
+                                }
+                            ]
+                            for chunk in client.chat.completions.create(
+                                model=_CHAT_MODEL, messages=follow_up, stream=True
+                            ):
+                                if chunk.choices and chunk.choices[0].delta.content:
+                                    yield chunk.choices[0].delta.content
+
+                except Exception as e:
+                    logger.error("Streaming error: %s", e)
+                    yield f"\n{_friendly_error(e)}"
+
+            return stream_generator()
+
+        else:
+            response = client.chat.completions.create(
+                model=_CHAT_MODEL,
+                messages=messages,
+                tools=_weather_tool,
+            )
+            msg = response.choices[0].message
+
+            if msg.tool_calls:
+                tc = msg.tool_calls[0]
+                if tc.function.name == "check_weather_for_ai":
+                    args = json.loads(tc.function.arguments)
+                    weather_result = check_weather_for_ai(**args)
+                    follow_up = messages + [
+                        {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [{"id": tc.id, "type": "function",
+                                            "function": {"name": tc.function.name, "arguments": tc.function.arguments}}]
+                        },
+                        {
+                            "role": "tool",
+                            "tool_call_id": tc.id,
+                            "content": json.dumps({"result": weather_result})
+                        }
+                    ]
+                    follow_up_resp = client.chat.completions.create(
+                        model=_CHAT_MODEL, messages=follow_up
+                    )
+                    return follow_up_resp.choices[0].message.content
+
+            return msg.content
+
     except Exception as e:
-        print(f"ask_gemini error: {e}")
-        msg = _friendly_error(e)
+        logger.error("ask_gemini error: %s", e)
+        err = _friendly_error(e)
         if stream:
             def _err():
-                yield msg
+                yield err
             return _err()
-        return msg
+        return err
 
 
 def analyze_plant_image(image_path, system_context=None, stream=False):
-    """Analyze a plant leaf image for disease detection using Gemini Vision."""
+    """Analyze a plant leaf image for disease detection using GPT-4o vision."""
     from PIL import Image
     try:
         img = Image.open(image_path)
         buf = io.BytesIO()
         img.save(buf, format='JPEG')
-        image_part = types.Part(
-            inline_data=types.Blob(data=buf.getvalue(), mime_type='image/jpeg')
-        )
+        image_b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
         base_prompt = """Analyze this plant leaf image and provide:
 1. **Disease Identification**: What disease or problem do you see? (if any)
@@ -211,131 +239,103 @@ Use simple English and be practical. If you cannot identify a specific disease, 
 
         prompt = f"{system_context}\n\n[TASK]: {base_prompt}" if system_context else base_prompt
 
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}}
+                ]
+            }
+        ]
+
         if stream:
             def stream_generator():
                 try:
-                    for chunk in client.models.generate_content_stream(
+                    response = client.chat.completions.create(
                         model=_VISION_MODEL,
-                        contents=[prompt, image_part]
-                    ):
-                        if chunk.text:
-                            yield chunk.text
+                        messages=messages,
+                        stream=True,
+                    )
+                    for chunk in response:
+                        if chunk.choices and chunk.choices[0].delta.content:
+                            yield chunk.choices[0].delta.content
                 except Exception as e:
-                    print(f"Error during vision streaming: {e}")
+                    logger.error("Vision streaming error: %s", e)
                     yield f" {_friendly_error(e)}"
             return stream_generator()
         else:
-            response = client.models.generate_content(
+            response = client.chat.completions.create(
                 model=_VISION_MODEL,
-                contents=[prompt, image_part]
+                messages=messages,
             )
-            return response.text.strip()
+            return response.choices[0].message.content.strip()
+
     except Exception as e:
-        print(f"analyze_plant_image error: {e}")
-        msg = _friendly_error(e)
+        logger.error("analyze_plant_image error: %s", e)
+        err = _friendly_error(e)
         if stream:
             def _err():
-                yield msg
+                yield err
             return _err()
-        return msg
+        return err
 
 
 def summarize_title(text: str) -> str:
     """Generate a short 5-word summary title for a conversation."""
     try:
-        response = client.models.generate_content(
+        response = client.chat.completions.create(
             model=_CHAT_MODEL,
-            contents=f"Summarize the following text into a short title of maximum 5 words. Do not use quotes or special characters. Text: {text}"
+            messages=[
+                {"role": "user", "content": (
+                    "Summarize the following text into a short title of maximum 5 words. "
+                    "Do not use quotes or special characters. "
+                    f"Text: {text}"
+                )}
+            ],
         )
-        return response.text.strip().replace('"', '').replace('*', '')
+        return response.choices[0].message.content.strip().replace('"', '').replace('*', '')
     except Exception as e:
-        print(f"Error generating title: {e}")
+        logger.error("summarize_title error: %s", e)
         return text[:30] + "..." if len(text) > 30 else text
 
 
 def transcribe_audio_file(file_path: str, mime_type: str, language: str = "en") -> str:
-    """Upload an audio file to Gemini Files API and return the transcription text."""
-    import time
-    file_ref = client.files.upload(
-        path=file_path,
-        config=types.UploadFileConfig(mime_type=mime_type, display_name="audio")
-    )
-    max_wait = 30
-    waited = 0
-    while file_ref.state.name == "PROCESSING" and waited < max_wait:
-        time.sleep(1)
-        waited += 1
-        file_ref = client.files.get(name=file_ref.name)
-
-    if file_ref.state.name != "ACTIVE":
-        raise Exception(f"File {file_ref.name} is not ACTIVE (state: {file_ref.state.name})")
-
-    language_names = {'en': 'English', 'ha': 'Hausa', 'ig': 'Igbo', 'yo': 'Yoruba'}
-    lang_name = language_names.get(language, 'English')
-    prompt = (
-        f"Transcribe this audio exactly as spoken. "
-        f"The language is {lang_name}. "
-        "Return ONLY the transcription text, nothing else."
-    )
-
-    response = client.models.generate_content(
-        model=_VISION_MODEL,
-        contents=[
-            types.Content(parts=[
-                types.Part(file_data=types.FileData(
-                    file_uri=file_ref.uri,
-                    mime_type=file_ref.mime_type
-                )),
-                types.Part(text=prompt)
-            ])
-        ]
-    )
-    try:
-        client.files.delete(name=file_ref.name)
-    except Exception:
-        pass
+    """Transcribe an audio file using OpenAI Whisper."""
+    # Whisper uses ISO 639-1 codes; pass None for non-English to let it auto-detect
+    lang_code = language if language == "en" else None
+    with open(file_path, "rb") as f:
+        response = client.audio.transcriptions.create(
+            model="whisper-1",
+            file=f,
+            language=lang_code,
+        )
     return response.text.strip()
 
 
 def respond_to_voice(file_path: str, mime_type: str, language: str = "en") -> str:
-    """Upload a voice note and ask Gemini to both understand and respond (used by Telegram bot)."""
-    import time
-    file_ref = client.files.upload(
-        path=file_path,
-        config=types.UploadFileConfig(mime_type=mime_type, display_name="voice_note")
-    )
-    max_wait = 30
-    waited = 0
-    while file_ref.state.name == "PROCESSING" and waited < max_wait:
-        time.sleep(1)
-        waited += 1
-        file_ref = client.files.get(name=file_ref.name)
+    """Transcribe a voice note then generate a farming response (used by Telegram bot)."""
+    transcription = transcribe_audio_file(file_path, mime_type, language)
 
-    if file_ref.state.name != "ACTIVE":
-        raise Exception(f"Voice file is not ACTIVE (state: {file_ref.state.name})")
+    lang_instructions = {
+        'en': "Answer in English.",
+        'ha': "Answer in Hausa language (Harshen Hausa).",
+        'ig': "Answer in Igbo language (Asụsụ Igbo).",
+        'yo': "Answer in Yoruba language (Èdè Yorùbá)."
+    }
+    lang_instruction = lang_instructions.get(language, "Answer in English.")
 
-    prompt = (
-        f"Listen to this audio and respond helpfully in {language} language. "
-        "Personalize your response for a Nigerian smallholder farmer."
+    response = client.chat.completions.create(
+        model=_CHAT_MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": SYSTEM_INSTRUCTION.strip() + f"\n\n{lang_instruction}\nPersonalize your response for a Nigerian smallholder farmer."
+            },
+            {"role": "user", "content": transcription}
+        ],
     )
-
-    response = client.models.generate_content(
-        model=_VISION_MODEL,
-        contents=[
-            types.Content(parts=[
-                types.Part(file_data=types.FileData(
-                    file_uri=file_ref.uri,
-                    mime_type=file_ref.mime_type
-                )),
-                types.Part(text=prompt)
-            ])
-        ]
-    )
-    try:
-        client.files.delete(name=file_ref.name)
-    except Exception:
-        pass
-    return response.text.strip()
+    return response.choices[0].message.content.strip()
 
 
 def text_to_speech(text, voice="Idera"):

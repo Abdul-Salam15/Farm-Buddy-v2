@@ -25,8 +25,21 @@ Your goal is to provide accurate, practical, and easy-to-understand farming advi
 - If you don't know the answer, admit it and suggest consulting a local extension agent.
 """
 
-_CHAT_MODEL = "gemini-2.0-flash"
-_VISION_MODEL = "gemini-2.0-flash"
+_CHAT_MODEL = "gemini-1.5-flash"
+_VISION_MODEL = "gemini-1.5-flash"
+
+
+def _friendly_error(e: Exception) -> str:
+    msg = str(e)
+    if "429" in msg or "RESOURCE_EXHAUSTED" in msg or "quota" in msg.lower():
+        return "FarmBuddy is currently busy due to high demand. Please wait a moment and try again."
+    if "400" in msg or "INVALID_ARGUMENT" in msg:
+        return "I couldn't process that request. Please try rephrasing your message."
+    if "401" in msg or "403" in msg or "API_KEY" in msg:
+        return "There's a configuration issue on our end. Please contact support."
+    if "503" in msg or "UNAVAILABLE" in msg:
+        return "The AI service is temporarily unavailable. Please try again shortly."
+    return "Something went wrong on my end. Please try again."
 
 # Explicit tool declaration for weather function calling
 _weather_tool = types.Tool(function_declarations=[
@@ -126,7 +139,7 @@ def ask_gemini(messages_history: list, weather_context=None, profile_context=Non
                                 yield text_chunk.text
                 except Exception as e:
                     print(f"Error during streaming: {e}")
-                    yield "\n[Sorry, I encountered an error. Please try again.]"
+                    yield f"\n{_friendly_error(e)}"
             return stream_generator()
         else:
             response = chat.send_message(last_message)
@@ -143,12 +156,13 @@ def ask_gemini(messages_history: list, weather_context=None, profile_context=Non
                     return chat.send_message(func_part).text
             return response.text
     except Exception as e:
-        error_msg = str(e)
+        print(f"ask_gemini error: {e}")
+        msg = _friendly_error(e)
         if stream:
             def _err():
-                yield f"An error occurred: {error_msg}"
+                yield msg
             return _err()
-        return f"An error occurred: {error_msg}"
+        return msg
 
 
 def analyze_plant_image(image_path, system_context=None, stream=False):
@@ -185,7 +199,7 @@ Use simple English and be practical. If you cannot identify a specific disease, 
                             yield chunk.text
                 except Exception as e:
                     print(f"Error during vision streaming: {e}")
-                    yield " [Error: Interrupted] "
+                    yield f" {_friendly_error(e)}"
             return stream_generator()
         else:
             response = client.models.generate_content(
@@ -194,11 +208,13 @@ Use simple English and be practical. If you cannot identify a specific disease, 
             )
             return response.text.strip()
     except Exception as e:
+        print(f"analyze_plant_image error: {e}")
+        msg = _friendly_error(e)
         if stream:
             def _err():
-                yield f"Error analyzing image: {str(e)}"
+                yield msg
             return _err()
-        return f"Error analyzing image: {str(e)}"
+        return msg
 
 
 def summarize_title(text: str) -> str:

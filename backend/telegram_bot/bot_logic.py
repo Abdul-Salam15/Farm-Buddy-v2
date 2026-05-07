@@ -820,14 +820,29 @@ async def dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Account not linked. Use /start with the token from the website.")
 
 async def tip(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show daily agricultural tip."""
+    """Show one tip for today (same tip all day, changes daily)."""
+    chat_id = update.effective_chat.id
+    info = await sync_to_async(db_get_profile_info)(chat_id)
+    if info:
+        l = get_localized_labels(info['lang'])
+        from accounts.views import get_daily_tip
+        tip_text = get_daily_tip(info['lang'])
+        await update.message.reply_text(f"{l['tip_header']}\n\n{tip_text}", parse_mode='Markdown')
+    else:
+        await update.message.reply_text("❌ Account not linked.")
+
+
+async def random_tip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show a random agricultural tip."""
+    import random as _random
     chat_id = update.effective_chat.id
     info = await sync_to_async(db_get_profile_info)(chat_id)
     if info:
         l = get_localized_labels(info['lang'])
         from accounts.views import TIPS
-        tip_text = TIPS.get(info['lang'], TIPS['en'])
-        await update.message.reply_text(f"{l['tip_header']}\n\n{tip_text}", parse_mode='Markdown')
+        lang_tips = TIPS.get(info['lang'], TIPS['en'])
+        tip_text = _random.choice(lang_tips)
+        await update.message.reply_text(f"🎲 **Random Farming Tip**\n\n{tip_text}", parse_mode='Markdown')
     else:
         await update.message.reply_text("❌ Account not linked.")
 
@@ -1276,7 +1291,8 @@ def run_bot():
             BotCommand("language", "Select Preferred Language"),
             BotCommand("dashboard", "Farm Summary"),
             BotCommand("edit_profile", "Interactive Profile Update"),
-            BotCommand("tip", "Daily Tip"),
+            BotCommand("tip", "Daily Tip (changes each day)"),
+            BotCommand("random_tip", "Get a random farming tip"),
             BotCommand("forecast", "Get weather forecast for the next 7 days"),
             BotCommand("connect", "Link web profile to Telegram"),
             BotCommand("signup", "Create an account on FarmBuddy"),
@@ -1308,6 +1324,7 @@ def run_bot():
     start_handler = CommandHandler('start', start)
     dash_handler = CommandHandler('dashboard', dashboard)
     tip_handler = CommandHandler('tip', tip)
+    random_tip_handler = CommandHandler('random_tip', random_tip)
     logout_handler = CommandHandler('logout', logout)
     forecast_handler = CommandHandler('forecast', forecast)
     lang_handler = CommandHandler('language', language_select)
@@ -1395,6 +1412,7 @@ def run_bot():
     application.add_handler(start_handler)
     application.add_handler(dash_handler)
     application.add_handler(tip_handler)
+    application.add_handler(random_tip_handler)
     application.add_handler(logout_handler)
     application.add_handler(forecast_handler)
     application.add_handler(lang_handler)

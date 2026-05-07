@@ -1,6 +1,7 @@
 import os
 import io
 import requests
+import logging
 from dotenv import load_dotenv
 from utils.weather_api import check_weather_for_ai
 
@@ -8,6 +9,12 @@ load_dotenv(override=True)
 
 from google import genai
 from google.genai import types
+try:
+    from google.genai import errors as genai_errors
+except ImportError:
+    genai_errors = None
+
+logger = logging.getLogger(__name__)
 
 _api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 if not _api_key:
@@ -29,19 +36,31 @@ _CHAT_MODEL = "gemini-1.5-flash"
 _VISION_MODEL = "gemini-1.5-flash"
 
 
+def _is_quota_error(e: Exception) -> bool:
+    # Check by exception type first (most reliable)
+    if genai_errors:
+        if isinstance(e, genai_errors.ClientError):
+            code = getattr(e, 'code', None) or getattr(e, 'status_code', None)
+            if code in (429, 503):
+                return True
+    # Fallback: string scan (case-insensitive)
+    msg = str(e).lower()
+    return any(s in msg for s in (
+        "429", "resource_exhausted", "quota", "rate_limit", "ratelimit",
+        "generaterequests", "too many requests", "retry_delay", "exhausted",
+    ))
+
+
 def _friendly_error(e: Exception) -> str:
-    msg = str(e)
-    msg_lower = msg.lower()
-    # google-genai SDK wraps quota errors with these strings
-    quota_signals = ("429", "resource_exhausted", "quota", "ratelimit", "rate_limit",
-                     "generaterequests", "toomanyrequests", "too many requests", "retry_delay")
-    if any(s in msg_lower for s in quota_signals):
+    logger.error("Gemini error [%s]: %s", type(e).__name__, e)
+    if _is_quota_error(e):
         return "FarmBuddy is currently busy due to high demand. Please wait a moment and try again."
-    if "400" in msg or "invalid_argument" in msg_lower:
+    msg = str(e).lower()
+    if "invalid_argument" in msg or ("400" in msg and "quota" not in msg):
         return "I couldn't process that request. Please try rephrasing your message."
-    if "401" in msg or "403" in msg or "api_key" in msg_lower:
+    if "401" in msg or "403" in msg or "api_key" in msg:
         return "There's a configuration issue on our end. Please contact support."
-    if "503" in msg or "unavailable" in msg_lower:
+    if "503" in msg or "unavailable" in msg:
         return "The AI service is temporarily unavailable. Please try again shortly."
     return "Something went wrong on my end. Please try again."
 

@@ -842,30 +842,30 @@ export default function ChatPage() {
                   </form>
                 ) : (
                   <div className={cn(
-                    "relative flex w-full items-center overflow-hidden rounded-lg text-sm transition-colors",
+                    "flex w-full items-center rounded-lg text-sm transition-colors",
                     currentConvId === conv.id
                       ? "bg-sidebar-accent"
                       : "hover:bg-sidebar-accent/50"
                   )}>
-                    {/* Clickable title + date — fills row, truncates, leaves room for ··· button */}
+                    {/* Title + date — min-w-0 + flex-1 lets it shrink and truncate properly */}
                     <button
                       onClick={() => loadConversation(conv.id)}
                       className={cn(
-                        "flex min-w-0 flex-1 flex-col gap-0.5 py-2 pl-3 pr-9 text-left",
+                        "flex min-w-0 flex-1 flex-col gap-0.5 py-2 pl-3 text-left",
                         currentConvId === conv.id
                           ? "text-sidebar-foreground"
                           : "text-sidebar-foreground/70"
                       )}
                     >
-                      <div className="flex min-w-0 w-full items-center gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
                         <MessageSquare className="h-4 w-4 shrink-0 opacity-60" />
-                        <span className="min-w-0 flex-1 truncate text-sm">{conv.title}</span>
+                        <span className="truncate text-sm">{conv.title}</span>
                       </div>
                       <span className="pl-6 text-xs text-sidebar-foreground/50">{formatRelativeTime(conv.updated_at)}</span>
                     </button>
 
-                    {/* ··· menu — always visible, absolutely positioned so title never touches it */}
-                    <div className="absolute right-1 top-1/2 -translate-y-1/2">
+                    {/* ··· menu — in normal flex flow so overflow-hidden never clips it */}
+                    <div className="shrink-0 px-1">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button

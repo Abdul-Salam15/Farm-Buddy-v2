@@ -16,7 +16,7 @@ import os
 import logging
 from datetime import timedelta
 from django.utils import timezone
-from django.core.mail import send_mail
+import resend
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_POST
@@ -547,9 +547,13 @@ def forgot_password_view(request):
                 )
 
                 try:
-                    send_mail(
-                        subject='FarmBuddy – Your Password Reset Code',
-                        message=(
+                    from django.conf import settings as django_settings
+                    resend.api_key = django_settings.RESEND_API_KEY
+                    resend.Emails.send({
+                        'from': django_settings.DEFAULT_FROM_EMAIL,
+                        'to': [user.email],
+                        'subject': 'FarmBuddy – Your Password Reset Code',
+                        'text': (
                             f'Hello {user.username},\n\n'
                             f'Your FarmBuddy password reset code is:\n\n'
                             f'    {otp_code}\n\n'
@@ -557,10 +561,7 @@ def forgot_password_view(request):
                             f'If you did not request a password reset, you can safely ignore this email.\n\n'
                             f'— The FarmBuddy Team'
                         ),
-                        from_email=None,
-                        recipient_list=[user.email],
-                        fail_silently=False,
-                    )
+                    })
                 except Exception:
                     logger.exception("Failed to send OTP email to %s", user.email)
                     return JsonResponse({'success': False, 'error': 'Failed to send email. Please try again or use the security question.'}, status=500)

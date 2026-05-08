@@ -164,8 +164,8 @@ JAZZMIN_UI_TWEAKS = {
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Email (OTP password reset) ────────────────────────────────────────────────
-RESEND_API_KEY     = os.getenv('RESEND_API_KEY', '')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'FarmBuddy <onboarding@resend.dev>')
+BREVO_API_KEY      = os.getenv('BREVO_API_KEY', '')
+BREVO_SENDER_EMAIL = os.getenv('BREVO_SENDER_EMAIL', 'onboarding@resend.dev')
 # ─────────────────────────────────────────────────────────────────────────────
 
 MIDDLEWARE = [

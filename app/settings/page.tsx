@@ -46,11 +46,19 @@ export default function SettingsPage() {
     confirm_password: "",
   })
 
+  const [securityData, setSecurityData] = useState({
+    security_answer: "",
+    security_answer_confirm: "",
+  })
+
   const [showOldPassword, setShowOldPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [showSecurityAnswer, setShowSecurityAnswer] = useState(false)
+  const [showSecurityConfirm, setShowSecurityConfirm] = useState(false)
   const [isProfileLoading, setIsProfileLoading] = useState(false)
   const [isPasswordLoading, setIsPasswordLoading] = useState(false)
+  const [isSecurityLoading, setIsSecurityLoading] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
   const router = useRouter()
@@ -152,6 +160,41 @@ export default function SettingsPage() {
       alert(t('settings.alert_password_failed'))
     } finally {
       setIsPasswordLoading(false)
+    }
+  }
+
+  const handleSecuritySave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (securityData.security_answer.toLowerCase() !== securityData.security_answer_confirm.toLowerCase()) {
+      alert(t('settings.alert_security_mismatch'))
+      return
+    }
+    setIsSecurityLoading(true)
+    try {
+      const response = await fetch(`${API_BASE_URL}/accounts/settings/`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCsrfToken()
+        },
+        body: JSON.stringify({
+          action: "update_security",
+          ...securityData
+        })
+      })
+      const data = await response.json()
+      if (data.success) {
+        alert(t('settings.alert_security_success'))
+        setSecurityData({ security_answer: "", security_answer_confirm: "" })
+      } else {
+        alert(data.error || t('settings.alert_security_failed'))
+      }
+    } catch (error) {
+      console.error("Security update failed", error)
+      alert(t('settings.alert_security_failed'))
+    } finally {
+      setIsSecurityLoading(false)
     }
   }
 
@@ -391,6 +434,89 @@ export default function SettingsPage() {
                     <>
                       <Shield className="h-4 w-4" />
                       {t('settings.update_password_button')}
+                    </>
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Security Question */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                  <Shield className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle>{t('settings.security_question')}</CardTitle>
+                  <CardDescription>{t('settings.security_question_desc')}</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSecuritySave} className="space-y-6">
+                <div className="rounded-lg border border-border bg-muted/40 px-4 py-3">
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
+                    {t('settings.security_question_label')}
+                  </p>
+                  <p className="text-sm font-medium">{t('settings.security_question_text')}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="securityAnswer">{t('settings.security_answer')}</Label>
+                  <div className="relative">
+                    <Input
+                      id="securityAnswer"
+                      type={showSecurityAnswer ? "text" : "password"}
+                      placeholder={t('settings.security_answer_placeholder')}
+                      className="pr-11"
+                      value={securityData.security_answer}
+                      onChange={(e) => setSecurityData({ ...securityData, security_answer: e.target.value })}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full w-11 text-muted-foreground hover:bg-transparent hover:text-foreground"
+                      onClick={() => setShowSecurityAnswer(!showSecurityAnswer)}
+                    >
+                      {showSecurityAnswer ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="securityConfirm">{t('settings.security_confirm_answer')}</Label>
+                  <div className="relative">
+                    <Input
+                      id="securityConfirm"
+                      type={showSecurityConfirm ? "text" : "password"}
+                      placeholder={t('settings.security_confirm_placeholder')}
+                      className="pr-11"
+                      value={securityData.security_answer_confirm}
+                      onChange={(e) => setSecurityData({ ...securityData, security_answer_confirm: e.target.value })}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full w-11 text-muted-foreground hover:bg-transparent hover:text-foreground"
+                      onClick={() => setShowSecurityConfirm(!showSecurityConfirm)}
+                    >
+                      {showSecurityConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t('settings.security_answer_hint')}</p>
+                </div>
+
+                <Button type="submit" className="gap-2" disabled={isSecurityLoading}>
+                  {isSecurityLoading ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                  ) : (
+                    <>
+                      <Shield className="h-4 w-4" />
+                      {t('settings.update_security_button')}
                     </>
                   )}
                 </Button>

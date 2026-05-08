@@ -414,7 +414,21 @@ def user_settings_view(request):
                     login(request, user)
                     return JsonResponse({'success': True, 'message': 'Password updated successfully!'})
                 return JsonResponse({'success': False, 'errors': password_form.errors}, status=400)
-            
+
+            elif action == 'update_security':
+                answer = data.get('security_answer', '').strip()
+                confirm = data.get('security_answer_confirm', '').strip()
+                if not answer:
+                    return JsonResponse({'success': False, 'error': 'Answer cannot be empty.'}, status=400)
+                if answer.lower() != confirm.lower():
+                    return JsonResponse({'success': False, 'error': 'Answers do not match.'}, status=400)
+                profile = getattr(request.user, 'farmerprofile', None)
+                if not profile:
+                    return JsonResponse({'success': False, 'error': 'Profile not found.'}, status=404)
+                profile.set_security_answer(answer)
+                profile.save()
+                return JsonResponse({'success': True, 'message': 'Security answer updated successfully!'})
+
             return JsonResponse({'success': False, 'error': 'Invalid action'}, status=400)
         except Exception as e:
             logger.exception("user_settings_view error")

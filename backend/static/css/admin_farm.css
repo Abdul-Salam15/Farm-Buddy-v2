@@ -1,0 +1,300 @@
+/* ================================================================
+   FarmBuddy Admin – Agricultural Green & White Theme
+   ================================================================ */
+
+:root {
+  --farm-green:        #2e7d32;
+  --farm-green-mid:    #388e3c;
+  --farm-green-light:  #4caf50;
+  --farm-green-pale:   #e8f5e9;
+  --farm-green-border: #c8e6c9;
+  --farm-gold:         #f9a825;
+  --farm-white:        #ffffff;
+  --farm-cream:        #f9fbe7;
+}
+
+/* ── Brand / sidebar header ─────────────────────────────────── */
+.brand-link {
+  background: linear-gradient(135deg, var(--farm-green), var(--farm-green-mid)) !important;
+  border-bottom: 1px solid var(--farm-green-light) !important;
+}
+.brand-link:hover {
+  background: linear-gradient(135deg, var(--farm-green-mid), var(--farm-green-light)) !important;
+}
+.brand-text {
+  color: #fff !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.5px;
+}
+
+/* ── Top navbar ─────────────────────────────────────────────── */
+.main-header.navbar {
+  background: var(--farm-white) !important;
+  border-bottom: 3px solid var(--farm-green-light) !important;
+  box-shadow: 0 2px 8px rgba(46, 125, 50, 0.12) !important;
+}
+.main-header .nav-link,
+.main-header .navbar-text {
+  color: var(--farm-green) !important;
+}
+.main-header .nav-link:hover {
+  color: var(--farm-green-mid) !important;
+}
+.navbar-search-block {
+  background: var(--farm-white) !important;
+}
+
+/* ── Sidebar ────────────────────────────────────────────────── */
+.main-sidebar,
+.main-sidebar::before {
+  background: linear-gradient(180deg, #1b5e20 0%, var(--farm-green) 60%, #2e7d32 100%) !important;
+}
+.sidebar-dark-success .nav-sidebar > .nav-item > .nav-link {
+  color: rgba(255,255,255,0.82) !important;
+}
+.sidebar-dark-success .nav-sidebar > .nav-item > .nav-link:hover {
+  background-color: rgba(255,255,255,0.12) !important;
+  color: #fff !important;
+}
+.sidebar-dark-success .nav-sidebar > .nav-item > .nav-link.active,
+.sidebar-dark-success .nav-sidebar > .nav-item.menu-open > .nav-link {
+  background: rgba(255,255,255,0.18) !important;
+  color: #fff !important;
+  border-left: 3px solid var(--farm-gold) !important;
+}
+.nav-sidebar .nav-treeview {
+  background: rgba(0,0,0,0.12) !important;
+}
+.sidebar .nav-header {
+  color: rgba(255,255,255,0.5) !important;
+  font-size: 0.7rem;
+  letter-spacing: 1px;
+}
+/* User panel in sidebar */
+.user-panel {
+  border-bottom: 1px solid rgba(255,255,255,0.15) !important;
+  padding: 12px 16px;
+}
+.user-panel .info a {
+  color: rgba(255,255,255,0.9) !important;
+}
+
+/* ── Main content background ────────────────────────────────── */
+.content-wrapper {
+  background-color: var(--farm-cream) !important;
+}
+.content-header {
+  background: var(--farm-white) !important;
+  border-bottom: 1px solid var(--farm-green-border) !important;
+  padding: 12px 24px !important;
+}
+.content-header h1 {
+  color: var(--farm-green) !important;
+  font-weight: 600;
+}
+.breadcrumb-item a {
+  color: var(--farm-green) !important;
+}
+.breadcrumb-item.active {
+  color: var(--farm-green-mid) !important;
+}
+
+/* ── Cards & panels ─────────────────────────────────────────── */
+.card {
+  border: 1px solid var(--farm-green-border) !important;
+  border-top: 3px solid var(--farm-green-light) !important;
+  box-shadow: 0 2px 8px rgba(46, 125, 50, 0.08) !important;
+  border-radius: 8px !important;
+  background: var(--farm-white) !important;
+}
+.card-header {
+  background: linear-gradient(135deg, var(--farm-green-pale), #f1f8e9) !important;
+  border-bottom: 1px solid var(--farm-green-border) !important;
+  color: var(--farm-green) !important;
+  font-weight: 600;
+}
+.card-title {
+  color: var(--farm-green) !important;
+}
+
+/* ── Dashboard info / small boxes ───────────────────────────── */
+.info-box {
+  border-radius: 8px !important;
+  border: 1px solid var(--farm-green-border) !important;
+  box-shadow: 0 2px 6px rgba(46,125,50,0.10) !important;
+}
+.info-box-icon {
+  background: var(--farm-green) !important;
+  border-radius: 8px 0 0 8px !important;
+}
+.small-box {
+  border-radius: 10px !important;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(46,125,50,0.15) !important;
+}
+.small-box.bg-success {
+  background: linear-gradient(135deg, var(--farm-green), var(--farm-green-light)) !important;
+}
+.small-box.bg-info {
+  background: linear-gradient(135deg, #00695c, #00897b) !important;
+}
+.small-box .icon {
+  color: rgba(255,255,255,0.25) !important;
+}
+
+/* ── Tables ─────────────────────────────────────────────────── */
+.table thead th {
+  background-color: var(--farm-green-pale) !important;
+  color: var(--farm-green) !important;
+  border-bottom: 2px solid var(--farm-green-border) !important;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  letter-spacing: 0.5px;
+}
+.table-striped tbody tr:nth-of-type(odd) {
+  background-color: rgba(232, 245, 233, 0.4) !important;
+}
+.table tbody tr:hover {
+  background-color: rgba(76, 175, 80, 0.08) !important;
+}
+#result_list thead th a,
+#result_list thead th {
+  color: var(--farm-green) !important;
+}
+.row1 { background: var(--farm-white) !important; }
+.row2 { background: rgba(232, 245, 233, 0.35) !important; }
+
+/* ── Buttons ────────────────────────────────────────────────── */
+.btn-success, .btn-primary {
+  background-color: var(--farm-green) !important;
+  border-color: var(--farm-green) !important;
+  color: #fff !important;
+}
+.btn-success:hover, .btn-primary:hover {
+  background-color: var(--farm-green-mid) !important;
+  border-color: var(--farm-green-mid) !important;
+}
+.btn-outline-success {
+  color: var(--farm-green) !important;
+  border-color: var(--farm-green) !important;
+}
+.btn-outline-success:hover {
+  background-color: var(--farm-green) !important;
+  color: #fff !important;
+}
+/* Save / submit row */
+.submit-row {
+  background: var(--farm-green-pale) !important;
+  border-top: 1px solid var(--farm-green-border) !important;
+  border-radius: 0 0 8px 8px;
+  padding: 12px !important;
+}
+.submit-row input, .submit-row a {
+  border-radius: 6px !important;
+}
+
+/* ── Forms ──────────────────────────────────────────────────── */
+.form-control:focus,
+.select2-container--default .select2-selection--single:focus {
+  border-color: var(--farm-green-light) !important;
+  box-shadow: 0 0 0 0.2rem rgba(76, 175, 80, 0.25) !important;
+}
+.select2-container--default .select2-results__option--highlighted {
+  background-color: var(--farm-green) !important;
+}
+.changeform-tabs-wrapper .nav-tabs .nav-link.active {
+  background: var(--farm-green) !important;
+  color: #fff !important;
+  border-color: var(--farm-green) !important;
+}
+.changeform-tabs-wrapper .nav-tabs .nav-link {
+  color: var(--farm-green) !important;
+}
+
+/* ── Links ──────────────────────────────────────────────────── */
+a {
+  color: var(--farm-green) !important;
+}
+a:hover {
+  color: var(--farm-green-mid) !important;
+}
+#nav-sidebar a, .main-sidebar a {
+  color: inherit !important;
+}
+
+/* ── Callouts & alerts ───────────────────────────────────────── */
+.callout {
+  border-left: 4px solid var(--farm-green-light) !important;
+  background: var(--farm-green-pale) !important;
+}
+.alert-success {
+  background: var(--farm-green-pale) !important;
+  border-color: var(--farm-green-border) !important;
+  color: var(--farm-green) !important;
+}
+
+/* ── Pagination ──────────────────────────────────────────────── */
+.paginator a, .paginator span.this-page {
+  border-color: var(--farm-green-border) !important;
+  color: var(--farm-green) !important;
+}
+.paginator span.this-page {
+  background: var(--farm-green) !important;
+  color: #fff !important;
+}
+
+/* ── Footer ──────────────────────────────────────────────────── */
+.main-footer {
+  background: var(--farm-green-pale) !important;
+  border-top: 1px solid var(--farm-green-border) !important;
+  color: var(--farm-green) !important;
+  font-size: 0.82rem;
+}
+
+/* ── Login page ──────────────────────────────────────────────── */
+.login-page {
+  background: linear-gradient(160deg, #1b5e20 0%, #2e7d32 50%, #388e3c 100%) !important;
+}
+.login-box-body, .card.login-card-body {
+  border-top: 4px solid var(--farm-green-light) !important;
+  border-radius: 8px !important;
+}
+.login-logo a,
+.login-logo {
+  color: #fff !important;
+  font-weight: 700;
+  font-size: 1.6rem;
+}
+
+/* ── Misc ────────────────────────────────────────────────────── */
+.object-tools a {
+  background: var(--farm-green) !important;
+}
+.object-tools a:hover {
+  background: var(--farm-green-mid) !important;
+}
+/* Action bar */
+#changelist-filter h2,
+#changelist-filter h3 {
+  background: var(--farm-green) !important;
+  color: #fff !important;
+  padding: 8px 12px;
+  margin: 0;
+  border-radius: 4px 4px 0 0;
+}
+#changelist-filter ul li.selected a {
+  color: var(--farm-green) !important;
+  font-weight: 600;
+}
+/* Sticky header highlight */
+.sticky .sorted {
+  background: rgba(76,175,80,0.15) !important;
+}
+/* Dashboard module headers */
+#content-main .module h2,
+#content-main .module caption {
+  background: var(--farm-green) !important;
+  color: #fff !important;
+  border-radius: 6px 6px 0 0;
+}

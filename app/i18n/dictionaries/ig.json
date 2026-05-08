@@ -254,6 +254,21 @@
     "error_no_question": "Akaụntụ a enweghị ajụjụ nchekwa. Biko kpọtụrụ nkwado.",
     "error_weak_password": "Okwuntughe ga-abụrịrị opekata mpe mkpụrụedemede 8.",
     "error_password_mismatch": "Okwuntughe adabaghị.",
-    "error_generic": "Ihe mere. Biko nwaa ọzọ."
+    "error_generic": "Ihe mere. Biko nwaa ọzọ.",
+    "choose_method_title": "Kedu otu ị chọrọ isi tụgharia okwuntughe gị?",
+    "choose_method_subtitle": "Họrọ ụzọ nweghachi",
+    "send_otp_button": "Zipu koodu na email",
+    "send_otp_button_short": "Jiri koodu email kama ya",
+    "use_question_button": "Jiri ajụjụ nchekwa kama ya",
+    "otp_sent_message": "Ezipụrụ koodu nwere ọnụọgụ 6 na {email}. Ọ ga-akwụsị na nkeji 10.",
+    "enter_otp_label": "Tinye koodu nkwenye",
+    "verify_otp_button": "Kwenye Koodu",
+    "resend_otp": "Zipu koodu ọzọ",
+    "resend_in": "Zipu ọzọ na {n}s",
+    "set_new_password": "Tọọ Okwuntughe Ọhụrụ",
+    "set_new_password_subtitle": "Họrọ okwuntughe ọhụrụ maka akaụntụ gị",
+    "error_otp_invalid": "Koodu ezighi ezi ma ọ bụ agwụla oge ya. Biko nwaa ọzọ.",
+    "error_otp_expired": "Koodu gị agwụla oge. Biko rịọ ọhụrụ.",
+    "error_too_soon": "Biko chere sekọnd {n} tupu ịrịọ koodu ọhụrụ."
   }
 }

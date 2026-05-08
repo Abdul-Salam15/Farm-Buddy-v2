@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 from django.utils.html import format_html
-from .models import FarmerProfile
+from .models import FarmerProfile, PasswordResetOTP
 
 
 class FarmerProfileInline(admin.StackedInline):
@@ -128,6 +128,14 @@ class FarmerProfileAdmin(admin.ModelAdmin):
             )
         return format_html('<span style="color:#6b7280">✗ Not linked</span>')
     get_telegram_linked.short_description = "Telegram"
+
+
+@admin.register(PasswordResetOTP)
+class PasswordResetOTPAdmin(admin.ModelAdmin):
+    list_display  = ('user', 'created_at', 'expires_at', 'is_used')
+    list_filter   = ('is_used',)
+    readonly_fields = ('user', 'otp', 'created_at', 'expires_at', 'is_used')
+    search_fields = ('user__username', 'user__email')
 
 
 # Re-register User with enhanced admin

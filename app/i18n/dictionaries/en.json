@@ -254,6 +254,21 @@
     "error_no_question": "This account does not have a security question set. Please contact support.",
     "error_weak_password": "Password must be at least 8 characters.",
     "error_password_mismatch": "Passwords do not match.",
-    "error_generic": "Something went wrong. Please try again."
+    "error_generic": "Something went wrong. Please try again.",
+    "choose_method_title": "How would you like to reset your password?",
+    "choose_method_subtitle": "Choose a recovery method",
+    "send_otp_button": "Send code to email",
+    "send_otp_button_short": "Use email code instead",
+    "use_question_button": "Use security question instead",
+    "otp_sent_message": "A 6-digit code was sent to {email}. It expires in 10 minutes.",
+    "enter_otp_label": "Enter verification code",
+    "verify_otp_button": "Verify Code",
+    "resend_otp": "Resend code",
+    "resend_in": "Resend in {n}s",
+    "set_new_password": "Set New Password",
+    "set_new_password_subtitle": "Choose a new password for your account",
+    "error_otp_invalid": "Invalid or expired code. Please try again.",
+    "error_otp_expired": "Your code has expired. Please request a new one.",
+    "error_too_soon": "Please wait {n} seconds before requesting a new code."
   }
 }

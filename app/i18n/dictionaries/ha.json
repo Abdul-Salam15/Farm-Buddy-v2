@@ -254,6 +254,21 @@
     "error_no_question": "Wannan akaunti ba ta da tambayar tsaro. Da fatan za ka tuntuɓi tallafi.",
     "error_weak_password": "Kalmar sirri dole ta kasance aƙalla haruffa 8.",
     "error_password_mismatch": "Kalmar sirri ba ta dace ba.",
-    "error_generic": "Wani abu ya faru. Da fatan sake gwadawa."
+    "error_generic": "Wani abu ya faru. Da fatan sake gwadawa.",
+    "choose_method_title": "Ta yaya kake son sake saita kalmar sirri?",
+    "choose_method_subtitle": "Zaɓi hanyar dawo da akauntu",
+    "send_otp_button": "Aika lambar tabbatarwa zuwa imel",
+    "send_otp_button_short": "Yi amfani da lambar imel maimakon haka",
+    "use_question_button": "Yi amfani da tambayar tsaro maimakon haka",
+    "otp_sent_message": "An aika lambar tabbatarwa mai lamba 6 zuwa {email}. Tana ƙarewa cikin minti 10.",
+    "enter_otp_label": "Shigar da lambar tabbatarwa",
+    "verify_otp_button": "Tabbatar da Lambar",
+    "resend_otp": "Sake aika lambar",
+    "resend_in": "Sake aika cikin {n}s",
+    "set_new_password": "Saita Kalmar Sirri Sabuwa",
+    "set_new_password_subtitle": "Zaɓi kalmar sirri sabuwa don akauntinka",
+    "error_otp_invalid": "Lambar ba daidai ba ko ta ƙare. Da fatan sake gwadawa.",
+    "error_otp_expired": "Lambar tabbatarwa ta ƙare. Da fatan nemi sabuwa.",
+    "error_too_soon": "Da fatan jira daƙiƙa {n} kafin neman lambar sabuwa."
   }
 }

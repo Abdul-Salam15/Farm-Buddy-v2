@@ -2,6 +2,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
 from django.contrib.auth.hashers import make_password
+from django.utils import timezone
+from datetime import timedelta
 
 
 class FarmerProfile(models.Model):
@@ -88,3 +90,17 @@ class FarmerProfile(models.Model):
             f'Previous crops: {self.past_crops or "Not specified"}\n'
             f'Livestock: {self.livestock_types or "None"}'
         )
+
+
+class PasswordResetOTP(models.Model):
+    user       = models.OneToOneField(User, on_delete=models.CASCADE, related_name='reset_otp')
+    otp        = models.CharField(max_length=6)
+    expires_at = models.DateTimeField()
+    is_used    = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_valid(self):
+        return not self.is_used and timezone.now() < self.expires_at
+
+    def __str__(self):
+        return f"OTP for {self.user.username} (used={self.is_used})"

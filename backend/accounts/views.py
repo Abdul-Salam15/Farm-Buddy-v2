@@ -7,12 +7,16 @@ from django.contrib.auth.hashers import check_password as check_hashed_password
 from django.contrib import messages
 from django.views.decorators.http import require_POST
 from .forms import CustomUserCreationForm, FarmerProfileForm, UserSettingsForm
-from .models import FarmerProfile
+from .models import FarmerProfile, PasswordResetOTP
 from chat.models import Conversation
 import json
 import random
+import secrets
 import os
 import logging
+from datetime import timedelta
+from django.utils import timezone
+from django.core.mail import send_mail
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_POST
@@ -458,30 +462,40 @@ def update_language_preference(request):
         return JsonResponse({'status': 'error', 'message': 'Server error'}, status=500)
     return JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=400)
 
+def _mask_email(email: str) -> str:
+    """Return a***@domain.com style masked email."""
+    if not email or '@' not in email:
+        return ''
+    local, domain = email.split('@', 1)
+    return local[0] + '***@' + domain
+
+
 @csrf_exempt
 def forgot_password_view(request):
-    """API endpoint for password recovery via security question."""
+    """API endpoint for password recovery — security question or email OTP."""
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
             action = data.get('action')
             username = data.get('username')
-            
+
             if not username:
                 return JsonResponse({'success': False, 'error': 'Username is required'}, status=400)
-                
+
             try:
                 user = User.objects.get(username__iexact=username)
                 profile = user.farmerprofile
             except (User.DoesNotExist, FarmerProfile.DoesNotExist):
-                # Use identical message to prevent username enumeration
                 return JsonResponse({'success': False, 'error': 'If this account exists, recovery is available.'}, status=404)
 
+            # ── Security question flow (existing) ──────────────────────────
             if action == 'get_question':
                 return JsonResponse({
                     'success': True,
                     'question': "What is the name of your grand father?",
-                    'has_answer': bool(profile.security_answer)
+                    'has_answer': bool(profile.security_answer),
+                    'has_email': bool(user.email),
+                    'email_hint': _mask_email(user.email),
                 })
 
             elif action == 'reset_password':
@@ -491,13 +505,11 @@ def forgot_password_view(request):
                 if not profile.security_answer:
                     return JsonResponse({'success': False, 'error': 'Security question not set for this account.'}, status=400)
 
-                # Support both legacy plaintext answers and new hashed answers
                 answer_matches = False
                 stored = profile.security_answer
                 if stored.startswith('pbkdf2_') or stored.startswith('bcrypt') or stored.startswith('argon2'):
                     answer_matches = check_hashed_password(answer.strip().lower(), stored)
                 else:
-                    # Legacy plaintext — compare and migrate to hashed
                     answer_matches = (answer.strip().lower() == stored.strip().lower())
                     if answer_matches:
                         profile.set_security_answer(answer.strip().lower())
@@ -510,10 +522,78 @@ def forgot_password_view(request):
                     return JsonResponse({'success': True, 'message': 'Password reset successful!'})
                 else:
                     return JsonResponse({'success': False, 'error': 'Incorrect security answer'}, status=400)
-            
+
+            # ── OTP flow (new) ──────────────────────────────────────────────
+            elif action == 'request_otp':
+                if not user.email:
+                    return JsonResponse({'success': False, 'error': 'No email address on this account.'}, status=400)
+
+                # Rate-limit: block if a fresh OTP was created < 60 seconds ago
+                existing = PasswordResetOTP.objects.filter(user=user, is_used=False).first()
+                if existing:
+                    age = (timezone.now() - existing.created_at).total_seconds()
+                    if age < 60:
+                        wait = int(60 - age)
+                        return JsonResponse({'success': False, 'too_soon': True, 'wait_seconds': wait}, status=429)
+
+                otp_code = str(secrets.randbelow(900000) + 100000)
+                PasswordResetOTP.objects.update_or_create(
+                    user=user,
+                    defaults={
+                        'otp': otp_code,
+                        'expires_at': timezone.now() + timedelta(minutes=10),
+                        'is_used': False,
+                    }
+                )
+
+                try:
+                    send_mail(
+                        subject='FarmBuddy – Your Password Reset Code',
+                        message=(
+                            f'Hello {user.username},\n\n'
+                            f'Your FarmBuddy password reset code is:\n\n'
+                            f'    {otp_code}\n\n'
+                            f'This code expires in 10 minutes. Do not share it with anyone.\n\n'
+                            f'If you did not request a password reset, you can safely ignore this email.\n\n'
+                            f'— The FarmBuddy Team'
+                        ),
+                        from_email=None,
+                        recipient_list=[user.email],
+                        fail_silently=False,
+                    )
+                except Exception:
+                    logger.exception("Failed to send OTP email to %s", user.email)
+                    return JsonResponse({'success': False, 'error': 'Failed to send email. Please try again or use the security question.'}, status=500)
+
+                return JsonResponse({'success': True, 'email_hint': _mask_email(user.email)})
+
+            elif action == 'verify_otp':
+                otp_input = data.get('otp', '').strip()
+                new_password = data.get('new_password', '')
+
+                try:
+                    record = PasswordResetOTP.objects.get(user=user)
+                except PasswordResetOTP.DoesNotExist:
+                    return JsonResponse({'success': False, 'error': 'No reset code found. Please request a new one.'}, status=400)
+
+                if not record.is_valid():
+                    return JsonResponse({'success': False, 'error': 'Your code has expired. Please request a new one.'}, status=400)
+
+                if not secrets.compare_digest(record.otp, otp_input):
+                    return JsonResponse({'success': False, 'error': 'Invalid code. Please check and try again.'}, status=400)
+
+                if len(new_password) < 8:
+                    return JsonResponse({'success': False, 'error': 'Password must be at least 8 characters.'}, status=400)
+
+                record.is_used = True
+                record.save(update_fields=['is_used'])
+                user.set_password(new_password)
+                user.save()
+                return JsonResponse({'success': True, 'message': 'Password reset successful!'})
+
             return JsonResponse({'success': False, 'error': 'Invalid action'}, status=400)
         except Exception as e:
             logger.exception("forgot_password_view error")
             return JsonResponse({'success': False, 'error': 'Server error'}, status=500)
-            
+
     return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)

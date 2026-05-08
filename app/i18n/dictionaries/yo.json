@@ -253,6 +253,21 @@
     "error_no_question": "Akauntì yí kò ní ìbéèrè ààbò. Jọ̀wọ́ kàn sí ẹgbẹ́ àtìlẹ́yìn.",
     "error_weak_password": "Ọ̀rọ̀ ìgbàwọlé gbọ́dọ̀ jẹ́ lẹ́tà 8 tàbí jù.",
     "error_password_mismatch": "Àwọn ọ̀rọ̀ ìgbàwọlé kò bára mu.",
-    "error_generic": "Ìṣòro kan wà. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
+    "error_generic": "Ìṣòro kan wà. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
+    "choose_method_title": "Báwo ni o ṣe fẹ́ tún ọ̀rọ̀ aṣínà rẹ ṣe?",
+    "choose_method_subtitle": "Yan ọ̀nà ìmúpadàbọ̀sípò",
+    "send_otp_button": "Rán koodu sí ìméèlì",
+    "send_otp_button_short": "Lo koodu ìméèlì dípò",
+    "use_question_button": "Lo ìbéèrè ààbò dípò",
+    "otp_sent_message": "A rán koodu olókè-ẹ̀fà sí {email}. Yóò parí ní ìṣẹ́jú 10.",
+    "enter_otp_label": "Tẹ koodu ìfòyebálẹ̀",
+    "verify_otp_button": "Jẹ́rìí Koodu",
+    "resend_otp": "Tún rán koodu",
+    "resend_in": "Tún rán ní {n}s",
+    "set_new_password": "Ṣètò Ọ̀rọ̀ Aṣínà Tuntun",
+    "set_new_password_subtitle": "Yan ọ̀rọ̀ aṣínà tuntun fún akauntì rẹ",
+    "error_otp_invalid": "Koodu àìtọ́ tàbí tí ó ti parí. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
+    "error_otp_expired": "Koodu rẹ ti parí. Jọ̀wọ́ béèrè tuntun.",
+    "error_too_soon": "Jọ̀wọ́ dúró ìṣẹ́jú {n} kí o tó béèrè koodu tuntun."
   }
 }

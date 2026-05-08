@@ -32,3 +32,9 @@ services:
         sync: false
       - key: TELEGRAM_BOT_TOKEN
         sync: false
+      - key: EMAIL_HOST_USER
+        sync: false          # Gmail address used to send OTP emails
+      - key: EMAIL_HOST_PASSWORD
+        sync: false          # Gmail App Password (not your regular password)
+      - key: DEFAULT_FROM_EMAIL
+        sync: false          # e.g. FarmBuddy <noreply@yourdomain.com>

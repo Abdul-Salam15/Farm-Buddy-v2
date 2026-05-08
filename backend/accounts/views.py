@@ -550,7 +550,7 @@ def forgot_password_view(request):
                     from django.conf import settings as django_settings
                     resend.api_key = django_settings.RESEND_API_KEY
                     resend.Emails.send({
-                        'from': django_settings.DEFAULT_FROM_EMAIL,
+                        'from_': django_settings.DEFAULT_FROM_EMAIL,
                         'to': [user.email],
                         'subject': 'FarmBuddy – Your Password Reset Code',
                         'text': (

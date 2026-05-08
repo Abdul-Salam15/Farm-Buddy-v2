@@ -53,7 +53,7 @@ export default function ForgotPasswordPage() {
     setOtpDigits(["", "", "", "", "", ""])
   }
 
-  // ── Step 1: look up username ──────────────────────────────────────────────
+  // ── Step 1: look up username ────────────────────────────────────────────
   const requestQuestion = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMsg(null)
@@ -87,7 +87,7 @@ export default function ForgotPasswordPage() {
     }
   }
 
-  // ── Send OTP ─────────────────────────────────────────────────────────────
+  // ── Send OTP ───────────────────────────────────────────────────────────────
   const sendOtp = async () => {
     setErrorMsg(null)
     setIsLoading(true)
@@ -117,8 +117,8 @@ export default function ForgotPasswordPage() {
     }
   }
 
-  // ── Verify OTP + set password ─────────────────────────────────────────────
-  const verifyOtp = async (e: React.FormEvent) => {
+  // ── Check OTP without consuming it ───────────────────────────────────────────
+  const checkOtp = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMsg(null)
     const otp = otpDigits.join("")
@@ -126,6 +126,32 @@ export default function ForgotPasswordPage() {
       setErrorMsg(t("forgot_password.error_otp_invalid"))
       return
     }
+    setIsLoading(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/accounts/forgot-password/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action: "check_otp", username: username.trim(), otp }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setStep("set_password")
+      } else {
+        setErrorMsg(data.error || t("forgot_password.error_generic"))
+      }
+    } catch {
+      setErrorMsg(t("forgot_password.error_generic"))
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // ── Verify OTP + set password ──────────────────────────────────────────────
+  const verifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setErrorMsg(null)
+    const otp = otpDigits.join("")
     if (newPassword.length < 8) {
       setErrorMsg(t("forgot_password.error_weak_password"))
       return
@@ -184,7 +210,7 @@ export default function ForgotPasswordPage() {
     }
   }
 
-  // ── OTP digit input handler ───────────────────────────────────────────────
+  // ── OTP digit input handler ──────────────────────────────────────────────
   const handleOtpChange = (index: number, value: string) => {
     const digit = value.replace(/\D/g, "").slice(-1)
     const next = [...otpDigits]
@@ -307,7 +333,7 @@ export default function ForgotPasswordPage() {
 
             {/* ── Step: enter OTP ── */}
             {step === "otp" && (
-              <form onSubmit={(e) => { e.preventDefault(); setStep("set_password") }} className="space-y-6">
+              <form onSubmit={checkOtp} className="space-y-6">
                 <div className="space-y-3">
                   <Label>{t("forgot_password.enter_otp_label")}</Label>
                   <div className="flex gap-2 justify-between">
@@ -340,8 +366,10 @@ export default function ForgotPasswordPage() {
                 </div>
 
                 <Button type="submit" className="h-11 w-full gap-2"
-                  disabled={otpDigits.join("").length < 6}>
-                  {t("forgot_password.verify_otp_button")}<ArrowRight className="h-4 w-4" />
+                  disabled={otpDigits.join("").length < 6 || isLoading}>
+                  {isLoading
+                    ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                    : <>{t("forgot_password.verify_otp_button")}<ArrowRight className="h-4 w-4" /></>}
                 </Button>
                 <Button type="button" variant="ghost" className="h-11 w-full gap-2"
                   onClick={() => { resetBack(); setStep(hasAnswer && hasEmail ? "choose_method" : "username") }}>

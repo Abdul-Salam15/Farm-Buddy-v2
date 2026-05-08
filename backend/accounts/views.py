@@ -562,9 +562,9 @@ def forgot_password_view(request):
                             f'— The FarmBuddy Team'
                         ),
                     })
-                except Exception as e:
+                except Exception:
                     logger.exception("Failed to send OTP email to %s", user.email)
-                    return JsonResponse({'success': False, 'error': f'Email error: {type(e).__name__}: {e}'}, status=500)
+                    return JsonResponse({'success': False, 'error': 'Failed to send email. Please try again or use the security question.'}, status=500)
 
                 return JsonResponse({'success': True, 'email_hint': _mask_email(user.email)})
 

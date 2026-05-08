@@ -523,6 +523,19 @@ def forgot_password_view(request):
                 else:
                     return JsonResponse({'success': False, 'error': 'Incorrect security answer'}, status=400)
 
+            # ── Check OTP without consuming it ──────────────────────────────
+            elif action == 'check_otp':
+                otp_input = data.get('otp', '').strip()
+                try:
+                    record = PasswordResetOTP.objects.get(user=user)
+                except PasswordResetOTP.DoesNotExist:
+                    return JsonResponse({'success': False, 'error': 'No reset code found. Please request a new one.'}, status=400)
+                if not record.is_valid():
+                    return JsonResponse({'success': False, 'error': 'Your code has expired. Please request a new one.'}, status=400)
+                if not secrets.compare_digest(record.otp, otp_input):
+                    return JsonResponse({'success': False, 'error': 'Invalid code. Please check and try again.'}, status=400)
+                return JsonResponse({'success': True})
+
             # ── OTP flow (new) ──────────────────────────────────────────────
             elif action == 'request_otp':
                 if not user.email:

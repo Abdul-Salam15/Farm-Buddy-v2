@@ -32,7 +32,7 @@ services:
         sync: false
       - key: TELEGRAM_BOT_TOKEN
         sync: false
-      - key: RESEND_API_KEY
-        sync: false          # Resend API key for OTP emails
-      - key: DEFAULT_FROM_EMAIL
-        sync: false          # e.g. FarmBuddy <onboarding@resend.dev>
+      - key: BREVO_API_KEY
+        sync: false          # Brevo (Sendinblue) API key for OTP emails
+      - key: BREVO_SENDER_EMAIL
+        sync: false          # Verified sender email in Brevo e.g. noreply@yourdomain.com

@@ -82,7 +82,7 @@ INSTALLED_APPS = [
     'telegram_bot',
 ]
 
-# ── FarmBuddy Admin Dashboard (Jazzmin) ──────────────────────────────────────
+# ── FarmBuddy Admin Dashboard (Jazzmin) ────────────────────────────────────────────
 JAZZMIN_SETTINGS = {
     "site_title": "FarmBuddy Admin",
     "site_header": "🌱 FarmBuddy",
@@ -161,12 +161,12 @@ JAZZMIN_UI_TWEAKS = {
     },
     "actions_sticky_top": True,
 }
-# ─────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────
 
-# ── Email (OTP password reset) ────────────────────────────────────────────────
-RESEND_API_KEY     = os.getenv('RESEND_API_KEY', '')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'FarmBuddy <onboarding@resend.dev>')
-# ─────────────────────────────────────────────────────────────────────────────
+# ── Email (OTP password reset) ────────────────────────────────────────────
+BREVO_API_KEY      = os.getenv('BREVO_API_KEY', '')
+BREVO_SENDER_EMAIL = os.getenv('BREVO_SENDER_EMAIL', 'onboarding@resend.dev')
+# ────────────────────────────────────────────────────────────────────────────
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

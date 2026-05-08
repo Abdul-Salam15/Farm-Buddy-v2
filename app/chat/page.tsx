@@ -800,7 +800,7 @@ export default function ChatPage() {
         </div>
       </div>
 
-      <ScrollArea className="flex-1 px-4">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 px-4">
         <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
           {t("chat.recent")}
         </p>
@@ -907,7 +907,7 @@ export default function ChatPage() {
             </p>
           )}
         </div>
-      </ScrollArea>
+      </div>
 
       <div className="border-t border-sidebar-border p-4">
         <div className="space-y-1">

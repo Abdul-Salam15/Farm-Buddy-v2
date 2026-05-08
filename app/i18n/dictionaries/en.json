@@ -152,6 +152,8 @@
     "back_to_chat": "Back to Chat",
     "general_settings": "General Settings",
     "manage_profile": "Manage your profile information",
+    "username": "Username",
+    "username_placeholder": "Enter your username",
     "first_name": "First Name",
     "last_name": "Last Name",
     "first_name_placeholder": "Enter your first name",

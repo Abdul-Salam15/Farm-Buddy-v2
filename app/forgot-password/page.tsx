@@ -72,12 +72,8 @@ export default function ForgotPasswordPage() {
         setHasEmail(data.has_email)
         setEmailHint(data.email_hint || "")
 
-        if (data.has_email && data.has_answer) {
+        if (data.has_email || data.has_answer) {
           setStep("choose_method")
-        } else if (data.has_email) {
-          await sendOtp()
-        } else if (data.has_answer) {
-          setStep("answer")
         } else {
           setErrorMsg(t("forgot_password.error_no_question"))
         }
@@ -286,18 +282,22 @@ export default function ForgotPasswordPage() {
             {/* ── Step: choose method ── */}
             {step === "choose_method" && (
               <div className="space-y-3">
-                <Button className="h-14 w-full justify-start gap-3 text-left" onClick={sendOtp} disabled={isLoading}>
-                  <Mail className="h-5 w-5 shrink-0" />
-                  <div>
-                    <p className="font-medium">{t("forgot_password.send_otp_button")}</p>
-                    <p className="text-xs opacity-75">{emailHint}</p>
-                  </div>
-                </Button>
-                <Button variant="outline" className="h-14 w-full justify-start gap-3 text-left"
-                  onClick={() => setStep("answer")} disabled={isLoading}>
-                  <HelpCircle className="h-5 w-5 shrink-0" />
-                  <p className="font-medium">{t("forgot_password.use_question_button")}</p>
-                </Button>
+                {hasEmail && (
+                  <Button className="h-14 w-full justify-start gap-3 text-left" onClick={sendOtp} disabled={isLoading}>
+                    <Mail className="h-5 w-5 shrink-0" />
+                    <div>
+                      <p className="font-medium">{t("forgot_password.send_otp_button")}</p>
+                      <p className="text-xs opacity-75">{emailHint}</p>
+                    </div>
+                  </Button>
+                )}
+                {hasAnswer && (
+                  <Button variant="outline" className="h-14 w-full justify-start gap-3 text-left"
+                    onClick={() => setStep("answer")} disabled={isLoading}>
+                    <HelpCircle className="h-5 w-5 shrink-0" />
+                    <p className="font-medium">{t("forgot_password.use_question_button")}</p>
+                  </Button>
+                )}
                 <Button variant="ghost" className="h-11 w-full gap-2"
                   onClick={() => { resetBack(); setStep("username") }}>
                   <ArrowLeft className="h-4 w-4" />{t("forgot_password.back_button")}

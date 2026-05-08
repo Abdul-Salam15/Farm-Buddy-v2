@@ -9,6 +9,7 @@ urlpatterns = [
     path('new/', views.new_conversation, name='new_conversation'),
     path('api/history/<int:conversation_id>/', views.api_conversation_history, name='api_history'),
     path('api/list/', views.api_list_conversations, name='api_list'),
+    path('api/search/', views.api_search_messages, name='api_search'),
     path('api/rename/<int:conversation_id>/', views.rename_conversation, name='rename_conversation'),
     path('api/delete/<int:conversation_id>/', views.delete_conversation, name='delete_conversation'),
     path('api/weather/', views.get_weather_data, name='get_weather_data'),

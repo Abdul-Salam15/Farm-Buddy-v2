@@ -282,6 +282,47 @@ def api_list_conversations(request):
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
+@require_GET
+def api_search_messages(request):
+    """Search message content and return matching conversations with snippets."""
+    query = request.GET.get('q', '').strip()
+    if len(query) < 2 or not request.user.is_authenticated:
+        return JsonResponse({'success': True, 'results': []})
+
+    try:
+        messages = (
+            Message.objects
+            .filter(conversation__user=request.user, content__icontains=query)
+            .select_related('conversation')
+            .order_by('-conversation__updated_at', 'id')
+        )
+
+        seen = set()
+        results = []
+        for msg in messages:
+            cid = msg.conversation_id
+            if cid in seen:
+                continue
+            seen.add(cid)
+            content = msg.content
+            idx = content.lower().find(query.lower())
+            start = max(0, idx - 40)
+            end = min(len(content), idx + len(query) + 60)
+            snippet = ('…' if start > 0 else '') + content[start:end].strip() + ('…' if end < len(content) else '')
+            results.append({
+                'conversation_id': cid,
+                'conversation_title': msg.conversation.title,
+                'snippet': snippet,
+                'updated_at': msg.conversation.updated_at.isoformat(),
+            })
+            if len(results) >= 20:
+                break
+
+        return JsonResponse({'success': True, 'results': results})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def upload_image(request):

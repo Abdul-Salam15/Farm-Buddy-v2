@@ -61,6 +61,13 @@ interface ConversationItem {
   updated_at: string
 }
 
+interface MessageSearchResult {
+  conversation_id: number
+  conversation_title: string
+  snippet: string
+  updated_at: string
+}
+
 function formatRelativeTime(dateStr: string): string {
   const date = new Date(dateStr)
   const now = new Date()
@@ -117,6 +124,8 @@ export default function ChatPage() {
   const [editingConvId, setEditingConvId] = useState<number | null>(null)
   const [editingTitle, setEditingTitle] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
+  const [messageSearchResults, setMessageSearchResults] = useState<MessageSearchResult[]>([])
+  const [isSearchingMessages, setIsSearchingMessages] = useState(false)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recognitionRef = useRef<any>(null)
@@ -759,6 +768,30 @@ export default function ChatPage() {
     conv.title.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  useEffect(() => {
+    if (!searchQuery || searchQuery.trim().length < 2) {
+      setMessageSearchResults([])
+      setIsSearchingMessages(false)
+      return
+    }
+    setIsSearchingMessages(true)
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `${API_BASE}/api/search/?q=${encodeURIComponent(searchQuery.trim())}`,
+          { credentials: 'include' }
+        )
+        const data = await res.json()
+        if (data.success) setMessageSearchResults(data.results)
+      } catch {
+        // silently ignore search errors
+      } finally {
+        setIsSearchingMessages(false)
+      }
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [searchQuery, API_BASE])
+
   const SidebarContent = () => (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-3 p-5">
@@ -801,8 +834,9 @@ export default function ChatPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 px-4">
+        {/* Section label: RECENT when idle, CHAT NAMES when searching */}
         <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
-          {t("chat.recent")}
+          {searchQuery ? "Chat Names" : t("chat.recent")}
         </p>
         <div className="space-y-1">
           {filteredConversations.length > 0 ? (
@@ -847,7 +881,6 @@ export default function ChatPage() {
                       ? "bg-sidebar-accent"
                       : "hover:bg-sidebar-accent/50"
                   )}>
-                    {/* Title + date — min-w-0 + flex-1 lets it shrink and truncate properly */}
                     <button
                       onClick={() => loadConversation(conv.id)}
                       className={cn(
@@ -864,7 +897,6 @@ export default function ChatPage() {
                       <span className="pl-6 text-xs text-sidebar-foreground/50">{formatRelativeTime(conv.updated_at)}</span>
                     </button>
 
-                    {/* ··· menu — in normal flex flow so overflow-hidden never clips it */}
                     <div className="shrink-0 px-1">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -901,12 +933,48 @@ export default function ChatPage() {
                 )}
               </div>
             ))
-          ) : (
+          ) : !searchQuery ? (
             <p className="py-8 text-center text-sm text-sidebar-foreground/40">
-              {searchQuery ? "No chats match your search" : t("chat.no_conversations")}
+              {t("chat.no_conversations")}
             </p>
-          )}
+          ) : null}
         </div>
+
+        {/* Message search results section */}
+        {searchQuery && searchQuery.trim().length >= 2 && (() => {
+          const titleMatchIds = new Set(filteredConversations.map(c => c.id))
+          const msgResults = messageSearchResults.filter(r => !titleMatchIds.has(r.conversation_id))
+          return (
+            <div className="mt-3">
+              <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
+                {isSearchingMessages ? "Searching messages…" : `In Messages${msgResults.length > 0 ? ` (${msgResults.length})` : ''}`}
+              </p>
+              {!isSearchingMessages && msgResults.length === 0 && filteredConversations.length === 0 && (
+                <p className="py-4 text-center text-sm text-sidebar-foreground/40">No results found</p>
+              )}
+              <div className="space-y-1">
+                {msgResults.map((result) => (
+                  <button
+                    key={result.conversation_id}
+                    onClick={() => loadConversation(result.conversation_id)}
+                    className={cn(
+                      "flex w-full min-w-0 flex-col gap-0.5 rounded-lg py-2 pl-3 pr-2 text-left transition-colors",
+                      currentConvId === result.conversation_id
+                        ? "bg-sidebar-accent text-sidebar-foreground"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50"
+                    )}
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <MessageSquare className="h-4 w-4 shrink-0 opacity-60" />
+                      <span className="truncate text-sm">{result.conversation_title}</span>
+                    </div>
+                    <span className="pl-6 text-xs text-sidebar-foreground/40 truncate">{result.snippet}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
       <div className="border-t border-sidebar-border p-4">

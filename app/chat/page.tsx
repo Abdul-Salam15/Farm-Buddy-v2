@@ -40,7 +40,8 @@ import {
   Check as SaveIcon,
   ArrowDown,
   Search,
-  MoreHorizontal
+  MoreHorizontal,
+  Loader2
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
@@ -115,6 +116,7 @@ export default function ChatPage() {
   const { theme, setTheme } = useTheme()
   const [isSpeaking, setIsSpeaking] = useState<string | number | null>(null)
   const [isPaused, setIsPaused] = useState(false)
+  const [isTTSLoading, setIsTTSLoading] = useState(false)
   const [copiedId, setCopiedId] = useState<string | number | null>(null)
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -402,8 +404,9 @@ export default function ChatPage() {
   }
 
   const playMessage = async (message: Message) => {
-    // If currently speaking this message — toggle pause/resume
+    // If currently speaking this message — toggle pause/resume (ignore clicks while loading)
     if (isSpeaking === message.id) {
+      if (isTTSLoading) return
       if (audioRef.current) {
         if (!isPaused) { audioRef.current.pause(); setIsPaused(true) }
         else { audioRef.current.play(); setIsPaused(false) }
@@ -422,6 +425,9 @@ export default function ChatPage() {
 
     setIsSpeaking(message.id)
     setIsPaused(false)
+    setIsTTSLoading(true)
+
+    const resetState = () => { setIsSpeaking(null); setIsPaused(false); setIsTTSLoading(false); audioRef.current = null }
 
     try {
       const response = await fetch(
@@ -434,25 +440,73 @@ export default function ChatPage() {
         }
       )
       if (!response.ok) throw new Error(`TTS request failed: ${response.status}`)
-      const blob = await response.blob()
-      const objectUrl = URL.createObjectURL(blob)
-      const audio = new Audio(objectUrl)
-      audioRef.current = audio
-      audio.onended = () => {
-        setIsSpeaking(null)
-        setIsPaused(false)
-        audioRef.current = null
-        URL.revokeObjectURL(objectUrl)
-      }
-      try {
-        await audio.play()
-      } catch (playErr) {
-        console.error("audio.play() failed, falling back to SpeechSynthesis", playErr)
-        URL.revokeObjectURL(objectUrl)
-        audioRef.current = null
-        speakWithBrowser(message.content)
+
+      const contentType = response.headers.get('Content-Type') || 'audio/mpeg'
+
+      // Stream via MediaSource so playback begins as soon as first chunks arrive
+      if (response.body && typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(contentType)) {
+        const ms = new MediaSource()
+        const msUrl = URL.createObjectURL(ms)
+        const audio = new Audio(msUrl)
+        audioRef.current = audio
+
+        audio.onended = () => { resetState(); URL.revokeObjectURL(msUrl) }
+
+        ms.addEventListener('sourceopen', async () => {
+          let sb: SourceBuffer
+          try { sb = ms.addSourceBuffer(contentType) }
+          catch {
+            // MSE doesn't support this content type; fall through to blob
+            URL.revokeObjectURL(msUrl); audioRef.current = null
+            const blob = await new Response(response.body).blob()
+            const blobUrl = URL.createObjectURL(blob)
+            const a = new Audio(blobUrl)
+            audioRef.current = a
+            a.onended = () => { resetState(); URL.revokeObjectURL(blobUrl) }
+            setIsTTSLoading(false)
+            await a.play().catch(() => { URL.revokeObjectURL(blobUrl); speakWithBrowser(message.content) })
+            return
+          }
+
+          const reader = response.body!.getReader()
+          const pump = async (): Promise<void> => {
+            const { done, value } = await reader.read()
+            if (done) { if (ms.readyState === 'open') { try { ms.endOfStream() } catch {} } return }
+            await new Promise<void>(r => { sb.addEventListener('updateend', () => r(), { once: true }); sb.appendBuffer(value) })
+            return pump()
+          }
+          pump().catch(console.error)
+        }, { once: true })
+
+        // Begin playback as soon as browser has enough data
+        await new Promise<void>((resolve, reject) => {
+          audio.addEventListener('canplay', async () => {
+            setIsTTSLoading(false)
+            try { await audio.play(); resolve() }
+            catch (e) { URL.revokeObjectURL(msUrl); audioRef.current = null; reject(e) }
+          }, { once: true })
+          audio.addEventListener('error', () => reject(new Error('audio error')), { once: true })
+        })
+      } else {
+        // Fallback: buffer full response then play (older browsers)
+        const blob = await response.blob()
+        const objectUrl = URL.createObjectURL(blob)
+        const audio = new Audio(objectUrl)
+        audioRef.current = audio
+        audio.onended = () => { resetState(); URL.revokeObjectURL(objectUrl) }
+        setIsTTSLoading(false)
+        try {
+          await audio.play()
+        } catch (playErr) {
+          console.error("audio.play() failed, falling back to SpeechSynthesis", playErr)
+          URL.revokeObjectURL(objectUrl)
+          audioRef.current = null
+          speakWithBrowser(message.content)
+        }
       }
     } catch (err) {
+      setIsTTSLoading(false)
+      setIsSpeaking(null)
       console.error("TTS API failed, falling back to SpeechSynthesis", err)
       speakWithBrowser(message.content)
     }
@@ -1145,7 +1199,12 @@ export default function ChatPage() {
                                 onClick={() => playMessage(message)}
                               >
                                 {isSpeaking === message.id ? (
-                                  isPaused ? (
+                                  isTTSLoading ? (
+                                    <>
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      {t('chat.loading')}
+                                    </>
+                                  ) : isPaused ? (
                                     <>
                                       <Play className="h-3.5 w-3.5" />
                                       {t('chat.resume')}

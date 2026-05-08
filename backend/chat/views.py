@@ -660,9 +660,9 @@ def speak_text(request):
         clean_text = _re.sub(r'^\s*[-*]\s+', '', clean_text, flags=_re.MULTILINE)
         clean_text = _re.sub(r'^\s*\d+\.\s+', '', clean_text, flags=_re.MULTILINE)
         clean_text = _re.sub(r'\n{3,}', '\n\n', clean_text).strip()
-        # YarnGPT works best with concise input; cap at 1000 chars
-        if len(clean_text) > 1000:
-            clean_text = clean_text[:1000].rsplit(' ', 1)[0] + '...'
+        # Cap at 300 chars so YarnGPT generates faster (shorter = lower latency)
+        if len(clean_text) > 300:
+            clean_text = clean_text[:300].rsplit(' ', 1)[0] + '...'
         
         # Use YarnGPT API for all languages
         from utils.gemini_api import YARNGPT_API_KEY, YARNGPT_API_URL
@@ -689,26 +689,29 @@ def speak_text(request):
             "voice": voice
         }
             
-        # Use stream=True to start passing chunks as soon as they arrive from YarnGPT
-        api_response = requests.post(YARNGPT_API_URL, headers=headers, json=payload, stream=True)
-        
+        # 5s connect timeout, 20s read timeout — prevents indefinite hangs
+        api_response = requests.post(
+            YARNGPT_API_URL, headers=headers, json=payload,
+            stream=True, timeout=(5, 20)
+        )
+
         if api_response.status_code == 200:
             content_type = api_response.headers.get('Content-Type', 'audio/mpeg')
-            
+
             # Pipe the response chunks directly to the browser
             response = StreamingHttpResponse(
-                api_response.iter_content(chunk_size=8192),
+                api_response.iter_content(chunk_size=4096),
                 content_type=content_type
             )
             response['Cache-Control'] = 'no-cache'
             return response
         else:
             error_text = api_response.text
+            print(f"YarnGPT API Error ({api_response.status_code}): {error_text[:200]}")
             return JsonResponse({'success': False, 'error': f"YarnGPT API Error: {error_text}"}, status=500)
         
+    except requests.exceptions.Timeout:
+        return JsonResponse({'success': False, 'error': 'TTS service timed out. Please try again.'}, status=504)
     except Exception as e:
-        try:
-            print(f"TTS Error: {e}")
-        except:
-            pass
+        print(f"TTS Error: {e}")
         return JsonResponse({'success': False, 'error': str(e)}, status=500)

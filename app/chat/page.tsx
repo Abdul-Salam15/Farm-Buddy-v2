@@ -134,6 +134,7 @@ export default function ChatPage() {
   const audioChunksRef = useRef<Blob[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const ttsAbortRef = useRef<AbortController | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const speechResultRef = useRef('')
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -404,9 +405,17 @@ export default function ChatPage() {
   }
 
   const playMessage = async (message: Message) => {
-    // If currently speaking this message — toggle pause/resume (ignore clicks while loading)
+    // Clicking the same message while loading → cancel the request
+    if (isSpeaking === message.id && isTTSLoading) {
+      ttsAbortRef.current?.abort()
+      ttsAbortRef.current = null
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
+      setIsSpeaking(null); setIsPaused(false); setIsTTSLoading(false)
+      return
+    }
+
+    // Clicking the same message while playing → pause / resume
     if (isSpeaking === message.id) {
-      if (isTTSLoading) return
       if (audioRef.current) {
         if (!isPaused) { audioRef.current.pause(); setIsPaused(true) }
         else { audioRef.current.play(); setIsPaused(false) }
@@ -417,17 +426,21 @@ export default function ChatPage() {
       return
     }
 
-    // Stop and clear previous audio if switching messages
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current = null
-    }
+    // Cancel any in-flight request for a different message and stop its audio
+    ttsAbortRef.current?.abort()
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
+
+    const abort = new AbortController()
+    ttsAbortRef.current = abort
 
     setIsSpeaking(message.id)
     setIsPaused(false)
     setIsTTSLoading(true)
 
-    const resetState = () => { setIsSpeaking(null); setIsPaused(false); setIsTTSLoading(false); audioRef.current = null }
+    const resetState = () => {
+      setIsSpeaking(null); setIsPaused(false); setIsTTSLoading(false)
+      audioRef.current = null
+    }
 
     try {
       const response = await fetch(
@@ -435,6 +448,7 @@ export default function ChatPage() {
         {
           method: 'POST',
           credentials: 'include',
+          signal: abort.signal,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: message.content, language: preferredLanguage }),
         }
@@ -456,7 +470,6 @@ export default function ChatPage() {
           let sb: SourceBuffer
           try { sb = ms.addSourceBuffer(contentType) }
           catch {
-            // MSE doesn't support this content type; fall through to blob
             URL.revokeObjectURL(msUrl); audioRef.current = null
             const blob = await new Response(response.body).blob()
             const blobUrl = URL.createObjectURL(blob)
@@ -470,6 +483,7 @@ export default function ChatPage() {
 
           const reader = response.body!.getReader()
           const pump = async (): Promise<void> => {
+            if (abort.signal.aborted) { reader.cancel(); return }
             const { done, value } = await reader.read()
             if (done) { if (ms.readyState === 'open') { try { ms.endOfStream() } catch {} } return }
             await new Promise<void>(r => { sb.addEventListener('updateend', () => r(), { once: true }); sb.appendBuffer(value) })
@@ -478,8 +492,9 @@ export default function ChatPage() {
           pump().catch(console.error)
         }, { once: true })
 
-        // Begin playback as soon as browser has enough data
+        // Begin playback as soon as browser has enough data buffered
         await new Promise<void>((resolve, reject) => {
+          abort.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true })
           audio.addEventListener('canplay', async () => {
             setIsTTSLoading(false)
             try { await audio.play(); resolve() }
@@ -490,6 +505,7 @@ export default function ChatPage() {
       } else {
         // Fallback: buffer full response then play (older browsers)
         const blob = await response.blob()
+        if (abort.signal.aborted) return
         const objectUrl = URL.createObjectURL(blob)
         const audio = new Audio(objectUrl)
         audioRef.current = audio
@@ -499,12 +515,12 @@ export default function ChatPage() {
           await audio.play()
         } catch (playErr) {
           console.error("audio.play() failed, falling back to SpeechSynthesis", playErr)
-          URL.revokeObjectURL(objectUrl)
-          audioRef.current = null
+          URL.revokeObjectURL(objectUrl); audioRef.current = null
           speakWithBrowser(message.content)
         }
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return  // cancelled by user — no fallback
       setIsTTSLoading(false)
       setIsSpeaking(null)
       console.error("TTS API failed, falling back to SpeechSynthesis", err)
@@ -1202,7 +1218,7 @@ export default function ChatPage() {
                                   isTTSLoading ? (
                                     <>
                                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                      {t('chat.loading')}
+                                      {t('loading')}
                                     </>
                                   ) : isPaused ? (
                                     <>

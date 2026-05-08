@@ -833,7 +833,7 @@ export default function ChatPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 px-4">
+      <div className="sidebar-scroll flex-1 overflow-y-auto overflow-x-hidden min-h-0 px-4">
         {/* Section label: RECENT when idle, CHAT NAMES when searching */}
         <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
           {searchQuery ? "Chat Names" : t("chat.recent")}

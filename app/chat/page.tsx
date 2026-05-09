@@ -1188,14 +1188,14 @@ export default function ChatPage() {
                         )}
                       >
                         {message.image_url && (
-                          <div className="mb-3 overflow-hidden rounded-2xl bg-muted/20">
+                          <div className="mb-3 overflow-hidden rounded-2xl bg-muted/20 w-fit">
                             <img
                               src={message.image_url.startsWith('blob:') || message.image_url.startsWith('data:') || message.image_url.startsWith('http')
                                 ? message.image_url
                                 : `${API_BASE_URL}${message.image_url}`
                               }
                               alt="Uploaded visual"
-                              className="max-h-80 w-full object-contain transition-transform hover:scale-[1.02] cursor-pointer"
+                              className="block max-h-44 max-w-[200px] object-contain transition-transform hover:scale-[1.02] cursor-pointer"
                               onClick={() => window.open(message.image_url?.startsWith('blob:') ? message.image_url : `${API_BASE_URL}${message.image_url}`, '_blank')}
                             />
                           </div>

@@ -25,6 +25,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import check_password as check_hashed_password
 from django.db import close_old_connections
+from django.utils import timezone
 import logging
 
 logger = logging.getLogger(__name__)
@@ -95,7 +96,9 @@ def db_get_or_create_conv(user):
 
 @_db
 def db_save_msg(conv, role, content):
-    return Message.objects.create(conversation=conv, role=role, content=content)
+    msg = Message.objects.create(conversation=conv, role=role, content=content)
+    Conversation.objects.filter(pk=conv.pk).update(updated_at=timezone.now())
+    return msg
 
 @_db
 def db_get_history(conv, limit=10):

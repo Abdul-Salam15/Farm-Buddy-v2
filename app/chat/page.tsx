@@ -571,6 +571,18 @@ export default function ChatPage() {
     })
   }
 
+  const silentRefreshMessages = useCallback(async (id: number) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/history/${id}/`, { credentials: 'include' })
+      const data = await res.json()
+      if (data.success) {
+        setMessages(data.messages)
+      }
+    } catch {
+      // silently ignore poll errors
+    }
+  }, [])
+
   const loadConversation = async (id: number) => {
     try {
       setIsLoading(true)
@@ -625,6 +637,20 @@ export default function ChatPage() {
       : conversations[0]
     if (target) loadConversation(target.id)
   }, [conversations])
+
+  // Poll for new messages every 10 s when viewing Telegram Chat
+  useEffect(() => {
+    if (!currentConvId) return
+    const currentConv = conversations.find(c => c.id === currentConvId)
+    if (currentConv?.title !== 'Telegram Chat') return
+
+    const interval = setInterval(() => {
+      silentRefreshMessages(currentConvId)
+      fetchConversations()
+    }, 10000)
+
+    return () => clearInterval(interval)
+  }, [currentConvId, conversations, silentRefreshMessages, fetchConversations])
 
   const handleSend = async () => {
     if ((!inputValue.trim() && !selectedImage) || isLoading) return

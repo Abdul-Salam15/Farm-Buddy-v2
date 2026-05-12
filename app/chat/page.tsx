@@ -1201,13 +1201,13 @@ export default function ChatPage() {
                     <div
                       key={message.id || idx}
                       className={cn(
-                        "flex w-full mb-6",
+                        "flex w-full min-w-0 mb-6",
                         message.role === "user" ? "justify-end" : "justify-start"
                       )}
                     >
                       <div
                         className={cn(
-                          "relative max-w-[85%] rounded-3xl px-5 py-4 shadow-sm transition-all duration-300",
+                          "relative max-w-[85%] overflow-hidden rounded-3xl px-5 py-4 shadow-sm transition-all duration-300",
                           message.role === "user"
                             ? "bg-gradient-to-br from-primary via-primary/90 to-primary/80 text-primary-foreground rounded-tr-none shadow-lg shadow-primary/10"
                             : "bg-card border border-border/50 text-card-foreground rounded-tl-none hover:shadow-md"

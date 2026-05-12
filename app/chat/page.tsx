@@ -1169,7 +1169,7 @@ export default function ChatPage() {
 
         <div className="flex flex-1 flex-col overflow-hidden min-h-0 relative">
           <ScrollArea className="flex-1 min-h-0" ref={scrollAreaRef}>
-            <div className="mx-auto max-w-3xl px-4 pt-20 pb-8">
+            <div className="mx-auto max-w-3xl px-4 pt-20 pb-8 overflow-x-hidden">
               {messages.length === 0 ? (
                 <div className="flex flex-col items-center py-8">
                   <div className="mb-6 rounded-2xl bg-accent/50 p-6">

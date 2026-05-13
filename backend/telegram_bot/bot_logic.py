@@ -42,9 +42,10 @@ def _format_refs_md(refs):
         label = _REF_LABELS.get(r.get('type', ''), r.get('type', 'Source').title())
         key = r.get('key', '')
         explanation = r.get('explanation', '')
-        # Escape underscores in keys for Markdown safety
+        # Escape underscores in keys and explanations for Markdown safety
         safe_key = str(key).replace('_', r'\_')
-        lines.append(f"• _{label} ({safe_key}):_ {explanation}")
+        safe_explanation = str(explanation).replace('_', r'\_')
+        lines.append(f"• _{label} ({safe_key}):_ {safe_explanation}")
     return "\n\n*Sources & Context*\n" + "\n".join(lines)
 
 
@@ -1130,7 +1131,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await sync_to_async(db_save_msg)(conv, 'assistant', clean_text, refs)
 
         # 6. Reply to User
-        await update.message.reply_text(reply_text, parse_mode='Markdown')
+        try:
+            await update.message.reply_text(reply_text, parse_mode='Markdown')
+        except Exception:
+            await update.message.reply_text(clean_text)
     else:
         await update.message.reply_text("❌ Your account is not linked. Please use /start with your token from the FarmBuddy website.")
 
@@ -1184,7 +1188,10 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
 
-            await update.message.reply_text(reply_text, parse_mode='Markdown')
+            try:
+                await update.message.reply_text(reply_text, parse_mode='Markdown')
+            except Exception:
+                await update.message.reply_text(clean_text)
         else:
             await update.message.reply_text("❌ Account not linked.")
     except Exception as e:
@@ -1231,7 +1238,10 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await sync_to_async(db_save_msg)(conv, 'assistant', clean_text, refs)
 
                 # 5. Reply
-                await update.message.reply_text(reply_text, parse_mode='Markdown')
+                try:
+                    await update.message.reply_text(reply_text, parse_mode='Markdown')
+                except Exception:
+                    await update.message.reply_text(clean_text)
             finally:
                 import os
                 if os.path.exists(tmp_path):

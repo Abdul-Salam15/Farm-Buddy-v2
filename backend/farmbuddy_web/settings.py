@@ -278,7 +278,7 @@ if _CLOUDINARY_NAME and _CLOUDINARY_KEY and _CLOUDINARY_SECRET:
 
 STORAGES = {
     'default': {'BACKEND': _default_storage},
-    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage'},
 }
 
 # Default primary key field type

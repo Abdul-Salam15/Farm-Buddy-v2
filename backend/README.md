@@ -23,7 +23,7 @@ Create `backend/.env`:
 SECRET_KEY=your_secret_key
 DEBUG=True
 FRONTEND_URL=http://localhost:3000
-GOOGLE_API_KEY=your_gemini_key
+OPENAI_API_KEY=your_openai_key
 OPENWEATHER_API_KEY=your_openweather_key
 YARNGPT_API_KEY=your_yarngpt_key
 TELEGRAM_BOT_TOKEN=your_bot_token

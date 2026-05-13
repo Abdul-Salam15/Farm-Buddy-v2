@@ -91,7 +91,7 @@ def _build_messages(messages_history: list, system_extra: str = "", profile_cont
     return result
 
 
-def ask_gemini(messages_history: list, weather_context=None, profile_context=None, stream=False, language='en'):
+def ask_openai(messages_history: list, weather_context=None, profile_context=None, stream=False, language='en'):
     """Send conversation history to OpenAI and return a text response or generator."""
     if not messages_history:
         if stream:
@@ -215,7 +215,7 @@ def ask_gemini(messages_history: list, weather_context=None, profile_context=Non
             return msg.content
 
     except Exception as e:
-        logger.error("ask_gemini error: %s", e)
+        logger.error("ask_openai error: %s", e)
         err = _friendly_error(e)
         if stream:
             def _err():

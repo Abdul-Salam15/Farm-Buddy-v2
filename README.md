@@ -2,7 +2,7 @@
 
 **AI-powered agricultural advisor for Nigerian smallholder farmers**
 
-FarmBuddy is a full-stack agricultural assistant that delivers personalised, real-time advice to smallholder farmers in Nigeria and West Africa. It combines a Next.js Progressive Web App with a Django REST backend, Google Gemini AI, live weather data, voice interaction in four Nigerian languages, and a full-featured Telegram bot — all designed for low-connectivity, low-literacy environments.
+FarmBuddy is a full-stack agricultural assistant that delivers personalised, real-time advice to smallholder farmers in Nigeria and West Africa. It combines a Next.js Progressive Web App with a Django REST backend, OpenAI (GPT-4o), live weather data, voice interaction in four Nigerian languages, and a full-featured Telegram bot — all designed for low-connectivity, low-literacy environments.
 
 ---
 
@@ -29,8 +29,8 @@ FarmBuddy is a full-stack agricultural assistant that delivers personalised, rea
 |---|---|---|
 | 🤖 **AI Advice** | Personalised Chat | Advice tailored to the farmer's soil type, location, crop history, and pest profile |
 | 🌍 **Localisation** | 4 Languages | Full UI and AI support for English, Hausa, Igbo, and Yoruba |
-| 📸 **Vision** | Plant Diagnosis | Upload a leaf photo — Gemini Vision identifies diseases and recommends treatments |
-| 🔊 **Voice I/O** | Speech In & Out | Speak questions via Gemini STT; listen to replies in Nigerian voices via YarnGPT |
+| 📸 **Vision** | Plant Diagnosis | Upload a leaf photo — OpenAI Vision (GPT-4o) identifies diseases and recommends treatments |
+| 🔊 **Voice I/O** | Speech In & Out | Speak questions via OpenAI Whisper; listen to replies in Nigerian voices via YarnGPT |
 | 🌦️ **Weather** | Contextual Forecasts | Live weather and 5-day forecasts injected automatically into AI responses |
 | 👤 **Accounts** | Cross-Platform Auth | Web signup, Telegram signup, and account linking between platforms |
 | 🔐 **Recovery** | Security Question | Password recovery via a secret question — no email required |
@@ -70,7 +70,7 @@ The safety of farmer data is a priority. FarmBuddy implements:
 graph TD
     Browser["Browser / PWA\n(Next.js 16 + React 19)"]
     Django["Django 6 API\n(Backend)"]
-    Gemini["Google Gemini API\n(Flash Lite / Vision / STT)"]
+    OpenAI["OpenAI API\n(GPT-4o-mini / GPT-4o Vision / Whisper)"]
     Weather["OpenWeatherMap API"]
     YarnGPT["YarnGPT TTS API\n(Nigerian Voices)"]
     DB["SQLite / PostgreSQL"]
@@ -78,7 +78,7 @@ graph TD
 
     Browser -- "HTTP / Fetch (NDJSON streaming)" --> Django
     Telegram -- "Polling" --> Django
-    Django -- "Text + Vision + STT" --> Gemini
+    Django -- "Text + Vision + STT" --> OpenAI
     Django -- "Current + Forecast" --> Weather
     Django -- "Voice Synthesis" --> YarnGPT
     Django -- "Persistence" --> DB
@@ -93,7 +93,7 @@ graph TD
     BotLogic[bot_logic.py]
     ORM[Django ORM]
     DB[(Database)]
-    AI[Gemini API]
+    AI[OpenAI API]
 
     Farmer -- "Text / Photo / Voice" --> TG
     TG -- "Webhook / Polling" --> BotLogic
@@ -113,8 +113,9 @@ graph TD
 | **Frontend** | Next.js / React / TypeScript | Next.js 16.1.6 / React 19 |
 | **Styling** | Tailwind CSS / Shadcn UI / Radix UI | Tailwind 4 |
 | **Backend** | Python / Django | Python 3.11.9 / Django 6.0 |
-| **AI — Chat & Vision** | Google Gemini | `gemini-flash-lite-latest` |
-| **AI — Speech-to-Text** | Google Gemini Audio | via `google-generativeai` SDK |
+| **AI — Chat** | OpenAI | `gpt-4o-mini` |
+| **AI — Vision** | OpenAI | `gpt-4o` |
+| **AI — Speech-to-Text** | OpenAI Whisper | `whisper-1` via `openai` SDK |
 | **AI — Text-to-Speech** | YarnGPT | Nigerian voices: Idera, Zainab, Chinenye |
 | **Weather** | OpenWeatherMap | REST API v2.5 |
 | **Telegram Bot** | python-telegram-bot | Async polling |
@@ -153,7 +154,7 @@ Farm-Buddy-v2/
     │       └── commands/       # run_telegram_bot management command
     ├── telegram_bot/           # Async Telegram bot logic
     ├── utils/
-    │   ├── gemini_api.py       # Gemini AI integration (chat + vision + STT)
+    │   ├── openai_api.py       # OpenAI integration (chat + vision + STT)
     │   ├── weather_api.py      # OpenWeatherMap integration
     │   └── image_processing.py # Image validation and compression
     ├── farmbuddy_web/          # Django project config (settings, urls, wsgi)
@@ -236,7 +237,7 @@ python manage.py run_telegram_bot
 | Issue | Solution |
 |---|---|
 | **`ffmpeg` not found** | Required for audio processing. Ensure it's installed and in your system PATH. |
-| **"Invalid API Key"** | Check your `backend/.env` file. Ensure `GOOGLE_API_KEY` has permission for Gemini Flash and Vision. |
+| **"Invalid API Key"** | Check your `backend/.env` file. Ensure `OPENAI_API_KEY` has access to GPT-4o and Whisper. |
 | **Port 8000 already in use** | Run the backend on a different port: `python manage.py runserver 8001`. Update `NEXT_PUBLIC_API_URL` in `.env.local` accordingly. |
 | **PWA not installing** | PWAs require HTTPS or `localhost` to work. Ensure you are accessing the app via `localhost:3000` during development. |
 | **Telegram Bot not responding** | Ensure your `TELEGRAM_BOT_TOKEN` is correct and that the `run_telegram_bot` process is running. |
@@ -263,7 +264,7 @@ DATABASE_URL=sqlite:///db.sqlite3
 # DATABASE_URL=postgresql://user:password@localhost/farmbuddy
 
 # AI APIs
-GOOGLE_API_KEY=your_google_gemini_api_key
+OPENAI_API_KEY=your_openai_api_key
 YARNGPT_API_KEY=your_yarngpt_api_key
 
 # Weather
@@ -348,7 +349,7 @@ The FarmBuddy Telegram bot provides a full farming assistant experience for user
 ### Capabilities
 
 - **Text chat** — Full AI conversations with profile-aware context
-- **Voice notes** — Audio transcribed via Gemini STT, answered in text
+- **Voice notes** — Audio transcribed via OpenAI Whisper, answered in text
 - **Plant photos** — Leaf images analysed for disease diagnosis
 - **Signup** — Complete account creation entirely within Telegram
 - **Password reset** — Recover account via security question, no email needed
@@ -417,7 +418,7 @@ worker: python manage.py run_telegram_bot
 - [ ] `FRONTEND_URL` set to your frontend URL (for CORS)
 - [ ] `DATABASE_URL` pointing to PostgreSQL (recommended over SQLite for production)
 - [ ] HTTPS enforced — `SECURE_SSL_REDIRECT=True` is enabled automatically when `DEBUG=False`
-- [ ] All API keys set (`GOOGLE_API_KEY`, `OPENWEATHER_API_KEY`, `YARNGPT_API_KEY`, `TELEGRAM_BOT_TOKEN`)
+- [ ] All API keys set (`OPENAI_API_KEY`, `OPENWEATHER_API_KEY`, `YARNGPT_API_KEY`, `TELEGRAM_BOT_TOKEN`)
 
 ---
 

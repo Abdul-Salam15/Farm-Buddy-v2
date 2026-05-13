@@ -9,7 +9,7 @@ import os
 
 # Add parent directory to path to import utils
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.gemini_api import ask_gemini, analyze_plant_image
+from utils.openai_api import ask_openai, analyze_plant_image
 from .context_builder import build_system_prompt, parse_xai_refs
 from utils.weather_api import get_weather, get_forecast, get_weather_by_city, get_forecast_by_city, format_weather_for_ai, format_forecast_for_ai
 
@@ -149,7 +149,7 @@ def send_message(request):
                     weather_context = ''
                     request.session.pop('weather_context', None)
                     request.session.pop('weather_context_ts', None)
-                stream = ask_gemini(messages_history, weather_context=weather_context, profile_context=system_prompt, stream=True, language=language)
+                stream = ask_openai(messages_history, weather_context=weather_context, profile_context=system_prompt, stream=True, language=language)
                 
                 for chunk in stream:
                     full_response += chunk
@@ -177,7 +177,7 @@ def send_message(request):
                 if conversation.messages.count() == 2 and (not conversation.title or conversation.title == "New Chat"):
                      def update_title_background(conv_id, text):
                         try:
-                            from utils.gemini_api import summarize_title
+                            from utils.openai_api import summarize_title
                             c = Conversation.objects.get(id=conv_id)
                             c.title = summarize_title(text)
                             c.save()
@@ -326,7 +326,7 @@ def api_search_messages(request):
 def upload_image(request):
     """Handle plant image upload and analysis"""
     try:
-        from utils.gemini_api import analyze_plant_image
+        from utils.openai_api import analyze_plant_image
         from utils.image_processing import validate_image
         from django.core.files.storage import default_storage
         
@@ -411,7 +411,7 @@ def upload_image(request):
         def vision_response_generator():
             full_response = ""
             try:
-                # Analyze image with Gemini Vision in streaming mode
+                # Analyze image with OpenAI Vision in streaming mode
                 stream = analyze_plant_image(image_path, system_context=combined_context, stream=True)
                 
                 for chunk in stream:
@@ -546,9 +546,9 @@ def get_weather_data(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def transcribe_audio(request):
-    """Transcribe audio using Gemini Files API with ACTIVE-state polling for reliability."""
+    """Transcribe audio using OpenAI Whisper."""
     import tempfile
-    from utils.gemini_api import transcribe_audio_file
+    from utils.openai_api import transcribe_audio_file
 
     try:
         if 'audio' not in request.FILES:
@@ -663,7 +663,7 @@ def speak_text(request):
             clean_text = clean_text[:300].rsplit(' ', 1)[0] + '...'
         
         # Use YarnGPT API for all languages
-        from utils.gemini_api import YARNGPT_API_KEY, YARNGPT_API_URL
+        from utils.openai_api import YARNGPT_API_KEY, YARNGPT_API_URL
         import requests
         from django.http import StreamingHttpResponse
         

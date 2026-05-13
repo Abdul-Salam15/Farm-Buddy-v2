@@ -36,3 +36,9 @@ services:
         sync: false          # Brevo (Sendinblue) API key for OTP emails
       - key: BREVO_SENDER_EMAIL
         sync: false          # Verified sender email in Brevo e.g. noreply@yourdomain.com
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false          # Cloudinary cloud name (persists uploaded plant photos)
+      - key: CLOUDINARY_API_KEY
+        sync: false          # Cloudinary API key
+      - key: CLOUDINARY_API_SECRET
+        sync: false          # Cloudinary API secret

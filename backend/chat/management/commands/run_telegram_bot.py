@@ -26,7 +26,8 @@ def _format_refs_md(refs):
     for r in refs:
         label = _REF_LABELS.get(r.get('type', ''), r.get('type', 'Source').title())
         safe_key = str(r.get('key', '')).replace('_', r'\_')
-        lines.append(f"• _{label} ({safe_key}):_ {r.get('explanation', '')}")
+        safe_explanation = str(r.get('explanation', '')).replace('_', r'\_')
+        lines.append(f"• _{label} ({safe_key}):_ {safe_explanation}")
     return "\n\n*Sources & Context*\n" + "\n".join(lines)
 from telegram.request import HTTPXRequest
 from functools import partial
@@ -286,8 +287,7 @@ class Command(BaseCommand):
             try:
                 await context.bot.send_message(chat_id=chat_id, text=formatted_response, parse_mode='Markdown')
             except Exception:
-                # Fallback if markdown still fails
-                await context.bot.send_message(chat_id=chat_id, text=clean_text + _format_refs_md(refs))
+                await context.bot.send_message(chat_id=chat_id, text=clean_text)
 
         except Exception as e:
             await context.bot.send_message(chat_id=chat_id, text=f"Error analyzing photo: {str(e)}")
@@ -414,7 +414,7 @@ class Command(BaseCommand):
             try:
                 await context.bot.send_message(chat_id=chat_id, text=formatted_response, parse_mode='Markdown')
             except Exception:
-                await context.bot.send_message(chat_id=chat_id, text=clean_text + _format_refs_md(refs))
+                await context.bot.send_message(chat_id=chat_id, text=clean_text)
 
         except Exception as e:
             await context.bot.send_message(chat_id=chat_id, text=f"Sorry, I encountered an error: {str(e)}")
@@ -461,7 +461,7 @@ class Command(BaseCommand):
                 try:
                     await context.bot.send_message(chat_id=chat_id, text=formatted_response, parse_mode='Markdown')
                 except Exception:
-                    await context.bot.send_message(chat_id=chat_id, text=clean_text + _format_refs_md(refs))
+                    await context.bot.send_message(chat_id=chat_id, text=clean_text)
             else:
                 await context.bot.send_message(chat_id=chat_id, text="Sorry, I couldn't understand the audio.")
 

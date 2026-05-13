@@ -79,6 +79,10 @@
     "sources_header": "Isi mmalite & Gburugburu",
     "source_profile": "Site na profaịlụ ugbo gị",
     "source_conversation": "Mkparịta ụka na-aga n'ihu",
+    "source_weather": "Data Ihu Igwe (OpenWeatherMap)",
+    "source_image": "Foto Osisi Ebuliri",
+    "source_knowledge": "Ihe Ọmụma Ọrụ Ugbo n'Ozuruoke",
+    "source_weather_explanation": "Data ihu igwe ndụ maka {location} site na OpenWeatherMap.",
     "input_placeholder_alt": "Pịa, kwuo okwu, ma ọ bụ bulite onyonyo..."
   },
   "profile": {

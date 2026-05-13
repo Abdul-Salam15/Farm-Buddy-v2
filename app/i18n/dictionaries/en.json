@@ -79,6 +79,10 @@
     "sources_header": "Sources & Context",
     "source_profile": "From Your Farm Profile",
     "source_conversation": "Continuing Conversation",
+    "source_weather": "Weather Data (OpenWeatherMap)",
+    "source_image": "Uploaded Plant Photo",
+    "source_knowledge": "General Agricultural Knowledge",
+    "source_weather_explanation": "Live weather data for {location} from OpenWeatherMap.",
     "input_placeholder_alt": "Type, speak, or upload an image..."
   },
   "profile": {

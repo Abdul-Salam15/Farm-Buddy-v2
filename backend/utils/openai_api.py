@@ -241,7 +241,19 @@ def analyze_plant_image(image_path, system_context=None, stream=False):
 5. **Recommended Treatment**: Practical, cost-effective solutions for Nigerian smallholder farmers
 6. **Prevention Tips**: How to prevent this in the future
 
-Use simple English and be practical. If you cannot identify a specific disease, explain what you observe and suggest consulting a local agricultural extension agent."""
+Use simple English and be practical. If you cannot identify a specific disease, explain what you observe and suggest consulting a local agricultural extension agent.
+
+You MUST end your response with a [FARMBUDDY_REFS] ... [/FARMBUDDY_REFS] block
+citing every source you used. Always include IMAGE:uploaded_photo. Add
+PROFILE:<field_key> entries for any profile fields (soil_type, location,
+current_crops, etc.) that informed your recommendations. Use the exact format
+"TYPE:KEY — explanation" (em-dash). Example:
+
+[FARMBUDDY_REFS]
+- IMAGE:uploaded_photo — Visible yellow halos on the leaf indicate early blight.
+- PROFILE:current_crops — Tailored the treatment to your tomato crop.
+- KNOWLEDGE:general — Standard organic fungicide recommendations.
+[/FARMBUDDY_REFS]"""
 
         prompt = f"{system_context}\n\n[TASK]: {base_prompt}" if system_context else base_prompt
 

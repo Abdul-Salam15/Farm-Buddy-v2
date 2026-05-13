@@ -78,6 +78,10 @@
     "sources_header": "Àwọn Orísun & Ìtàn",
     "source_profile": "Láti inú ozi Profaili Oko rẹ",
     "source_conversation": "Ìfọ̀rọ̀wérọ̀ tí ń tẹ̀síwájú",
+    "source_weather": "Dátà Ojú-ọjọ́ (OpenWeatherMap)",
+    "source_image": "Àwòrán Ohun-ọ̀gbìn tí a Gbé",
+    "source_knowledge": "Ìmọ̀ Iṣẹ́-àgbẹ̀ Gbogbogbò",
+    "source_weather_explanation": "Dátà ojú-ọjọ́ ààyè fún {location} láti OpenWeatherMap.",
     "input_placeholder_alt": "Tẹ́, sọ̀rọ̀, tàbí fi àwòrán sí i..."
   },
   "profile": {

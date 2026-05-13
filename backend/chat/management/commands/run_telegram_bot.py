@@ -6,6 +6,28 @@ from django.conf import settings
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 from utils.openai_api import ask_openai, analyze_plant_image
+from chat.context_builder import parse_xai_refs
+
+
+_REF_LABELS = {
+    'profile':   '👤 Profile',
+    'history':   '💬 Past chat',
+    'weather':   '🌦️ OpenWeatherMap',
+    'image':     '📸 Uploaded photo',
+    'knowledge': '🌱 General knowledge',
+}
+
+
+def _format_refs_md(refs):
+    """Format a refs list as a Markdown 'Sources & Context' section for Telegram."""
+    if not refs:
+        return ''
+    lines = []
+    for r in refs:
+        label = _REF_LABELS.get(r.get('type', ''), r.get('type', 'Source').title())
+        safe_key = str(r.get('key', '')).replace('_', r'\_')
+        lines.append(f"• _{label} ({safe_key}):_ {r.get('explanation', '')}")
+    return "\n\n*Sources & Context*\n" + "\n".join(lines)
 from telegram.request import HTTPXRequest
 from functools import partial
 from utils.weather_api import get_weather, get_forecast, get_weather_by_city, get_forecast_by_city
@@ -223,23 +245,27 @@ class Command(BaseCommand):
                 profile_context = await sync_to_async(profile.to_context_string)()
                 full_context = f"Farmer Profile:\n{profile_context}\n\nWeather Content:\n{weather_context}"
 
-            response = await loop.run_in_executor(None, partial(analyze_plant_image, file_path, conversation_history=None))
-            
+            raw_response = await loop.run_in_executor(None, partial(analyze_plant_image, file_path, system_context=full_context))
+
+            # Parse refs from the vision response
+            clean_text, refs = parse_xai_refs(raw_response)
+
             # Add to history (Multimodal history is tricky in simple list, just add text summary for now)
             history.append({'role': 'user', 'content': '[Sent a photo for analysis]'})
-            history.append({'role': 'assistant', 'content': response})
+            history.append({'role': 'assistant', 'content': clean_text})
             if chat_id not in self.user_sessions: self.user_sessions[chat_id] = {}
             self.user_sessions[chat_id]['history'] = history
-            
-            # Format
+
+            # Format and append sources
             # specific fix for OpenAI output which uses ** for bold and ### for headers
-            formatted_response = response.replace("**", "*").replace("### ", "*").replace("###", "*")
-            
+            formatted_response = clean_text.replace("**", "*").replace("### ", "*").replace("###", "*")
+            formatted_response += _format_refs_md(refs)
+
             try:
                 await context.bot.send_message(chat_id=chat_id, text=formatted_response, parse_mode='Markdown')
             except Exception:
                 # Fallback if markdown still fails
-                await context.bot.send_message(chat_id=chat_id, text=response)
+                await context.bot.send_message(chat_id=chat_id, text=clean_text + _format_refs_md(refs))
                 
         except Exception as e:
             await context.bot.send_message(chat_id=chat_id, text=f"Error analyzing photo: {str(e)}")
@@ -352,19 +378,21 @@ class Command(BaseCommand):
             
             # Run blocking task in executor
             loop = asyncio.get_running_loop()
-            response = await loop.run_in_executor(None, partial(ask_openai, history, weather_context=full_context))
-            
-            # Append assistant response to history
-            history.append({'role': 'assistant', 'content': response})
+            raw_response = await loop.run_in_executor(None, partial(ask_openai, history, weather_context=full_context))
+
+            # Strip refs block from history-stored text to keep prompts clean
+            clean_text, refs = parse_xai_refs(raw_response)
+            history.append({'role': 'assistant', 'content': clean_text})
             self.user_sessions[chat_id]['history'] = history
-            
-            # Format for Telegram Markdown (Legacy)
-            formatted_response = response.replace("**", "*").replace("### ", "*").replace("###", "*")
-            
+
+            # Format for Telegram Markdown (Legacy) and append sources
+            formatted_response = clean_text.replace("**", "*").replace("### ", "*").replace("###", "*")
+            formatted_response += _format_refs_md(refs)
+
             try:
                 await context.bot.send_message(chat_id=chat_id, text=formatted_response, parse_mode='Markdown')
             except Exception:
-                await context.bot.send_message(chat_id=chat_id, text=response)
+                await context.bot.send_message(chat_id=chat_id, text=clean_text + _format_refs_md(refs))
 
         except Exception as e:
             await context.bot.send_message(chat_id=chat_id, text=f"Sorry, I encountered an error: {str(e)}")
@@ -403,13 +431,15 @@ class Command(BaseCommand):
                     full_context = f"Farmer Profile:\n{profile_context}\n\nWeather Content:\n{weather_context}"
                 
                 messages = [{'role': 'user', 'content': text}]
-                ai_response = await loop.run_in_executor(None, partial(ask_openai, messages, weather_context=full_context))
-                
-                formatted_response = ai_response.replace("**", "*").replace("### ", "*").replace("###", "*")
+                raw_response = await loop.run_in_executor(None, partial(ask_openai, messages, weather_context=full_context))
+
+                clean_text, refs = parse_xai_refs(raw_response)
+                formatted_response = clean_text.replace("**", "*").replace("### ", "*").replace("###", "*")
+                formatted_response += _format_refs_md(refs)
                 try:
                     await context.bot.send_message(chat_id=chat_id, text=formatted_response, parse_mode='Markdown')
                 except Exception:
-                    await context.bot.send_message(chat_id=chat_id, text=ai_response)
+                    await context.bot.send_message(chat_id=chat_id, text=clean_text + _format_refs_md(refs))
             else:
                 await context.bot.send_message(chat_id=chat_id, text="Sorry, I couldn't understand the audio.")
 

@@ -660,21 +660,22 @@ export default function ChatPage() {
     return () => clearInterval(interval)
   }, [currentConvId, conversations, silentRefreshMessages, fetchConversations])
 
-  const handleSend = async () => {
-    if ((!inputValue.trim() && !selectedImage) || isLoading) return
+  const handleSend = async (overrideText?: string) => {
+    const textToSend = overrideText !== undefined ? overrideText : inputValue
+    if ((!textToSend.trim() && !selectedImage) || isLoading) return
 
     const tempUserMsg: Message = {
       id: Date.now(),
       role: "user",
-      content: inputValue || (selectedImage ? "[Plant image uploaded for analysis]" : ""),
+      content: textToSend || (selectedImage ? "[Plant image uploaded for analysis]" : ""),
       image_url: previewUrl || undefined
     }
 
     setMessages(prev => [...prev, tempUserMsg])
-    const messageToSend = inputValue
+    const messageToSend = textToSend
     const imageToSend = selectedImage
 
-    setInputValue("")
+    if (overrideText === undefined) setInputValue("")
     setSelectedImage(null)
     setPreviewUrl(null)
     setUploadProgress(0)
@@ -927,6 +928,16 @@ export default function ChatPage() {
               startTransition(() => setDisplayQuery(val))
               if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
               searchTimerRef.current = setTimeout(() => setSearchQuery(val), 400)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && displayQuery.trim()) {
+                const query = displayQuery.trim()
+                if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+                startTransition(() => setDisplayQuery(""))
+                setSearchQuery("")
+                setSidebarOpen(false)
+                handleSend(query)
+              }
             }}
             placeholder="Search chats..."
             className="w-full rounded-lg border border-sidebar-border bg-sidebar-accent/40 py-2 pl-8 pr-3 text-sm text-sidebar-foreground placeholder:text-sidebar-foreground/40 outline-none focus:border-primary/50 focus:bg-sidebar-accent/60 transition-colors"

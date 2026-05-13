@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef, startTransition } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -62,12 +62,6 @@ interface ConversationItem {
   updated_at: string
 }
 
-interface MessageSearchResult {
-  conversation_id: number
-  conversation_title: string
-  snippet: string
-  updated_at: string
-}
 
 function formatRelativeTime(dateStr: string): string {
   const date = new Date(dateStr)
@@ -125,12 +119,8 @@ export default function ChatPage() {
   const audioPlayerKey = preferredLanguage;
   const [editingConvId, setEditingConvId] = useState<number | null>(null)
   const [editingTitle, setEditingTitle] = useState("")
-  const [displayQuery, setDisplayQuery] = useState("")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [messageSearchResults, setMessageSearchResults] = useState<MessageSearchResult[]>([])
-  const [isSearchingMessages, setIsSearchingMessages] = useState(false)
+  const [searchText, setSearchText] = useState("")
   const scrollAreaRef = useRef<HTMLDivElement>(null)
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recognitionRef = useRef<any>(null)
   const audioChunksRef = useRef<Blob[]>([])
@@ -869,34 +859,6 @@ export default function ChatPage() {
     }
   }
 
-  const filteredConversations = conversations.filter(conv =>
-    conv.title.toLowerCase().includes(displayQuery.toLowerCase())
-  )
-
-  useEffect(() => {
-    if (!searchQuery || searchQuery.trim().length < 2) {
-      setMessageSearchResults([])
-      setIsSearchingMessages(false)
-      return
-    }
-    setIsSearchingMessages(true)
-    const timer = setTimeout(async () => {
-      try {
-        const res = await fetch(
-          `${API_BASE}/api/search/?q=${encodeURIComponent(searchQuery.trim())}`,
-          { credentials: 'include' }
-        )
-        const data = await res.json()
-        if (data.success) setMessageSearchResults(data.results)
-      } catch {
-        // silently ignore search errors
-      } finally {
-        setIsSearchingMessages(false)
-      }
-    }, 350)
-    return () => clearTimeout(timer)
-  }, [searchQuery, API_BASE])
-
   const SidebarContent = () => (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-3 p-5">
@@ -922,33 +884,22 @@ export default function ChatPage() {
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-sidebar-foreground/40 pointer-events-none" />
           <input
             type="text"
-            value={displayQuery}
-            onChange={(e) => {
-              const val = e.target.value
-              startTransition(() => setDisplayQuery(val))
-              if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
-              searchTimerRef.current = setTimeout(() => setSearchQuery(val), 400)
-            }}
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && displayQuery.trim()) {
-                const query = displayQuery.trim()
-                if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
-                startTransition(() => setDisplayQuery(""))
-                setSearchQuery("")
+              if (e.key === 'Enter' && searchText.trim()) {
+                const query = searchText.trim()
+                setSearchText("")
                 setSidebarOpen(false)
                 handleSend(query)
               }
             }}
-            placeholder="Search chats..."
+            placeholder="Ask FarmBuddy..."
             className="w-full rounded-lg border border-sidebar-border bg-sidebar-accent/40 py-2 pl-8 pr-3 text-sm text-sidebar-foreground placeholder:text-sidebar-foreground/40 outline-none focus:border-primary/50 focus:bg-sidebar-accent/60 transition-colors"
           />
-          {displayQuery && (
+          {searchText && (
             <button
-              onClick={() => {
-                if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
-                startTransition(() => setDisplayQuery(""))
-                setSearchQuery("")
-              }}
+              onClick={() => setSearchText("")}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sidebar-foreground/40 hover:text-sidebar-foreground"
             >
               <X className="h-3.5 w-3.5" />
@@ -958,13 +909,12 @@ export default function ChatPage() {
       </div>
 
       <div className="sidebar-scroll flex-1 overflow-y-auto overflow-x-hidden min-h-0 px-4">
-        {/* Section label: RECENT when idle, CHAT NAMES when searching */}
         <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
-          {displayQuery ? "Chat Names" : t("chat.recent")}
+          {t("chat.recent")}
         </p>
         <div className="space-y-1">
-          {filteredConversations.length > 0 ? (
-            filteredConversations.map((conv) => (
+          {conversations.length > 0 ? (
+            conversations.map((conv) => (
               <div key={conv.id} className="group relative">
                 {editingConvId === conv.id ? (
                   <form
@@ -1057,48 +1007,13 @@ export default function ChatPage() {
                 )}
               </div>
             ))
-          ) : !displayQuery ? (
+          ) : (
             <p className="py-8 text-center text-sm text-sidebar-foreground/40">
               {t("chat.no_conversations")}
             </p>
-          ) : null}
+          )}
         </div>
 
-        {/* Message search results section */}
-        {searchQuery && searchQuery.trim().length >= 2 && (() => {
-          const titleMatchIds = new Set(filteredConversations.map(c => c.id))
-          const msgResults = messageSearchResults.filter(r => !titleMatchIds.has(r.conversation_id))
-          return (
-            <div className="mt-3">
-              <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
-                {isSearchingMessages ? "Searching messages…" : `In Messages${msgResults.length > 0 ? ` (${msgResults.length})` : ''}`}
-              </p>
-              {!isSearchingMessages && msgResults.length === 0 && filteredConversations.length === 0 && (
-                <p className="py-4 text-center text-sm text-sidebar-foreground/40">No results found</p>
-              )}
-              <div className="space-y-1">
-                {msgResults.map((result) => (
-                  <button
-                    key={result.conversation_id}
-                    onClick={() => loadConversation(result.conversation_id)}
-                    className={cn(
-                      "flex w-full min-w-0 flex-col gap-0.5 rounded-lg py-2 pl-3 pr-2 text-left transition-colors",
-                      currentConvId === result.conversation_id
-                        ? "bg-sidebar-accent text-sidebar-foreground"
-                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50"
-                    )}
-                  >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <MessageSquare className="h-4 w-4 shrink-0 opacity-60" />
-                      <span className="truncate text-sm">{result.conversation_title}</span>
-                    </div>
-                    <span className="pl-6 text-xs text-sidebar-foreground/40 truncate">{result.snippet}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )
-        })()}
       </div>
 
       <div className="border-t border-sidebar-border p-4">

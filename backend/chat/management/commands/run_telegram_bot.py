@@ -257,6 +257,7 @@ class Command(BaseCommand):
             # Persist to DB so the web app can render the photo + diagnosis.
             # With Cloudinary configured, Message.image gets pushed to the CDN.
             if profile:
+                user_caption = update.message.caption or '[Sent a photo for analysis]'
                 def _save_photo_messages():
                     conv, _ = Conversation.objects.get_or_create(
                         user=profile.user, title="Telegram Chat",
@@ -264,7 +265,7 @@ class Command(BaseCommand):
                     with open(file_path, 'rb') as fh:
                         Message.objects.create(
                             conversation=conv, role='user',
-                            content='[Sent a photo for analysis]',
+                            content=user_caption,
                             image=File(fh, name=os.path.basename(file_path)),
                         )
                     Message.objects.create(

@@ -1176,10 +1176,11 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             from django.core.files import File
             conv = await sync_to_async(db_get_or_create_conv)(user)
             import os
+            user_caption = update.message.caption or "[Uploaded a leaf photo for diagnosis]"
             with open(tmp_path, 'rb') as fh:
                 django_image = File(fh, name=os.path.basename(tmp_path))
                 await sync_to_async(db_save_msg)(
-                    conv, 'user', "[Uploaded a leaf photo for diagnosis]",
+                    conv, 'user', user_caption,
                     image=django_image,
                 )
             await sync_to_async(db_save_msg)(conv, 'assistant', clean_text, refs)

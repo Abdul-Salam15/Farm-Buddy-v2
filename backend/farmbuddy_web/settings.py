@@ -255,26 +255,31 @@ STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Media files (user uploads)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# Cloudinary storage for uploaded media (plant photos).
-# When the three env vars are present, media uploads go to Cloudinary so they
-# survive Render's ephemeral filesystem redeploys. Otherwise we fall back to
-# local disk so dev setups without Cloudinary keep working.
+# Storage backends. Django 5+ uses the unified STORAGES dict; the legacy
+# DEFAULT_FILE_STORAGE / STATICFILES_STORAGE settings were removed in 6.0.
+# When Cloudinary env vars are present, media uploads go to Cloudinary so they
+# survive Render's ephemeral filesystem; otherwise fall back to local disk.
 _CLOUDINARY_NAME = os.getenv('CLOUDINARY_CLOUD_NAME', '')
 _CLOUDINARY_KEY = os.getenv('CLOUDINARY_API_KEY', '')
 _CLOUDINARY_SECRET = os.getenv('CLOUDINARY_API_SECRET', '')
+_default_storage = 'django.core.files.storage.FileSystemStorage'
 if _CLOUDINARY_NAME and _CLOUDINARY_KEY and _CLOUDINARY_SECRET:
     CLOUDINARY_STORAGE = {
         'CLOUD_NAME': _CLOUDINARY_NAME,
         'API_KEY': _CLOUDINARY_KEY,
         'API_SECRET': _CLOUDINARY_SECRET,
     }
-    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+    _default_storage = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+STORAGES = {
+    'default': {'BACKEND': _default_storage},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+}
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

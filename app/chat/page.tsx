@@ -125,11 +125,12 @@ export default function ChatPage() {
   const audioPlayerKey = preferredLanguage;
   const [editingConvId, setEditingConvId] = useState<number | null>(null)
   const [editingTitle, setEditingTitle] = useState("")
-  const [searchInput, setSearchInput] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
   const [messageSearchResults, setMessageSearchResults] = useState<MessageSearchResult[]>([])
   const [isSearchingMessages, setIsSearchingMessages] = useState(false)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recognitionRef = useRef<any>(null)
   const audioChunksRef = useRef<Blob[]>([])
@@ -868,13 +869,8 @@ export default function ChatPage() {
   }
 
   const filteredConversations = conversations.filter(conv =>
-    conv.title.toLowerCase().includes(searchInput.toLowerCase())
+    conv.title.toLowerCase().includes(searchQuery.toLowerCase())
   )
-
-  useEffect(() => {
-    const timer = setTimeout(() => setSearchQuery(searchInput), 300)
-    return () => clearTimeout(timer)
-  }, [searchInput])
 
   useEffect(() => {
     if (!searchQuery || searchQuery.trim().length < 2) {
@@ -924,15 +920,23 @@ export default function ChatPage() {
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-sidebar-foreground/40 pointer-events-none" />
           <input
+            ref={searchInputRef}
             type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value
+              if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+              searchTimerRef.current = setTimeout(() => setSearchQuery(val), 200)
+            }}
             placeholder="Search chats..."
             className="w-full rounded-lg border border-sidebar-border bg-sidebar-accent/40 py-2 pl-8 pr-3 text-sm text-sidebar-foreground placeholder:text-sidebar-foreground/40 outline-none focus:border-primary/50 focus:bg-sidebar-accent/60 transition-colors"
           />
-          {searchInput && (
+          {searchQuery && (
             <button
-              onClick={() => { setSearchInput(""); setSearchQuery("") }}
+              onClick={() => {
+                if (searchInputRef.current) searchInputRef.current.value = ""
+                if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+                setSearchQuery("")
+              }}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sidebar-foreground/40 hover:text-sidebar-foreground"
             >
               <X className="h-3.5 w-3.5" />
@@ -944,7 +948,7 @@ export default function ChatPage() {
       <div className="sidebar-scroll flex-1 overflow-y-auto overflow-x-hidden min-h-0 px-4">
         {/* Section label: RECENT when idle, CHAT NAMES when searching */}
         <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
-          {searchInput ? "Chat Names" : t("chat.recent")}
+          {searchQuery ? "Chat Names" : t("chat.recent")}
         </p>
         <div className="space-y-1">
           {filteredConversations.length > 0 ? (
@@ -1041,7 +1045,7 @@ export default function ChatPage() {
                 )}
               </div>
             ))
-          ) : !searchInput ? (
+          ) : !searchQuery ? (
             <p className="py-8 text-center text-sm text-sidebar-foreground/40">
               {t("chat.no_conversations")}
             </p>

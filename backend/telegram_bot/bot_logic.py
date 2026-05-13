@@ -19,7 +19,7 @@ if not django.conf.settings.configured:
 
 from accounts.models import FarmerProfile
 from chat.models import Conversation, Message
-from utils.gemini_api import ask_gemini, analyze_plant_image, respond_to_voice
+from utils.openai_api import ask_openai, analyze_plant_image, respond_to_voice
 from utils.weather_api import get_forecast_by_city
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
@@ -1062,7 +1062,7 @@ async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # --- HANDLERS ---
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle regular text messages using Gemini."""
+    """Handle regular text messages using OpenAI."""
     chat_id = update.effective_chat.id
     user_text = update.message.text
     logger.debug("Received message from %s: %s...", chat_id, user_text[:20])
@@ -1083,9 +1083,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 2. Get history (last 10)
         history = await sync_to_async(db_get_history)(conv)
         
-        # 3. Ask Gemini with profile context
+        # 3. Ask OpenAI with profile context
         await update.message.chat.send_action("typing")
-        response_text = await sync_to_async(ask_gemini)(history, profile_context=profile_context, language=lang)
+        response_text = await sync_to_async(ask_openai)(history, profile_context=profile_context, language=lang)
         
         # 4. Save Assistant reply
         await sync_to_async(db_save_msg)(conv, 'assistant', response_text)
@@ -1116,7 +1116,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(l['analyzing_photo'])
             await update.message.chat.send_action("upload_photo")
             
-            # Analyze using Gemini Vision
+            # Analyze using OpenAI Vision
             analysis_result = analyze_plant_image(tmp_path)
             
             # Clean up
@@ -1136,7 +1136,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Error analyzing photo: {str(e)}")
 
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle voice notes using Gemini's multi-modal capabilities."""
+    """Handle voice notes using OpenAI Whisper."""
     chat_id = update.effective_chat.id
     print(f"DEBUG: Received voice from {chat_id}", flush=True)
     try:
@@ -1153,11 +1153,11 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await voice_file.download_to_drive(tmp.name)
                 tmp_path = tmp.name
             
-            # We can actually use Gemini to "transcribe and answer" at once
+            # Use OpenAI Whisper to transcribe and answer
             await update.message.reply_text("🎧 Listening to your voice message...")
             await update.message.chat.send_action("record_voice")
             
-            # Upload to Gemini and respond
+            # Transcribe and respond via OpenAI
             try:
                 mime_type = "audio/ogg"
 
@@ -1165,7 +1165,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 conv = await sync_to_async(db_get_or_create_conv)(user)
                 await sync_to_async(db_save_msg)(conv, 'user', "[Sent a voice note]")
 
-                # 2. Ask Gemini to listen and respond
+                # 2. Ask OpenAI to listen and respond
                 response_text = await sync_to_async(respond_to_voice)(tmp_path, mime_type, lang)
 
                 # 3. Save assistant reply

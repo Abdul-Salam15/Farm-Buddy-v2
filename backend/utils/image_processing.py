@@ -57,9 +57,9 @@ def compress_image(image_file, max_size=(1024, 1024), quality=85):
         raise Exception(f"Error compressing image: {str(e)}")
 
 
-def prepare_image_for_gemini(image_path):
+def prepare_image_for_openai(image_path):
     """
-    Prepare image for Gemini Vision API
+    Prepare image for OpenAI Vision API
     Returns: PIL Image object
     """
     try:

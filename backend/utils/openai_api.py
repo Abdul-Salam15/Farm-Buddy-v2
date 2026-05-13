@@ -78,8 +78,10 @@ def _friendly_error(e: Exception) -> str:
     return "Something went wrong on my end. Please try again."
 
 
-def _build_messages(messages_history: list, system_extra: str = "") -> list:
+def _build_messages(messages_history: list, system_extra: str = "", profile_context: str = "") -> list:
     system = SYSTEM_INSTRUCTION.strip()
+    if profile_context:
+        system += f"\n\n{profile_context}"
     if system_extra:
         system += f"\n\n{system_extra}"
     result = [{"role": "system", "content": system}]
@@ -89,7 +91,7 @@ def _build_messages(messages_history: list, system_extra: str = "") -> list:
     return result
 
 
-def ask_gemini(messages_history: list, weather_context=None, profile_context=None, stream=False, language='en'):
+def ask_openai(messages_history: list, weather_context=None, profile_context=None, stream=False, language='en'):
     """Send conversation history to OpenAI and return a text response or generator."""
     if not messages_history:
         if stream:
@@ -109,13 +111,11 @@ def ask_gemini(messages_history: list, weather_context=None, profile_context=Non
     from datetime import datetime
     current_date = datetime.now().strftime("%A, %B %d, %Y")
     system_extra = f"Current Date: {current_date}\nIMPORTANT INSTRUCTION: {lang_instruction}"
-    if profile_context:
-        system_extra += f"\nUser Profile:\n{profile_context}"
     if weather_context:
         system_extra += f"\nWeather Info: {weather_context}"
 
     recent = messages_history[-10:]
-    messages = _build_messages(recent, system_extra)
+    messages = _build_messages(recent, system_extra, profile_context=profile_context or "")
 
     try:
         if stream:
@@ -215,7 +215,7 @@ def ask_gemini(messages_history: list, weather_context=None, profile_context=Non
             return msg.content
 
     except Exception as e:
-        logger.error("ask_gemini error: %s", e)
+        logger.error("ask_openai error: %s", e)
         err = _friendly_error(e)
         if stream:
             def _err():

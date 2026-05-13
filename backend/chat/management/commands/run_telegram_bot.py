@@ -5,7 +5,7 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
-from utils.gemini_api import ask_gemini, analyze_plant_image
+from utils.openai_api import ask_openai, analyze_plant_image
 from telegram.request import HTTPXRequest
 from functools import partial
 from utils.weather_api import get_weather, get_forecast, get_weather_by_city, get_forecast_by_city
@@ -232,7 +232,7 @@ class Command(BaseCommand):
             self.user_sessions[chat_id]['history'] = history
             
             # Format
-            # specific fix for Gemini output which uses ** for bold and ### for headers
+            # specific fix for OpenAI output which uses ** for bold and ### for headers
             formatted_response = response.replace("**", "*").replace("### ", "*").replace("###", "*")
             
             try:
@@ -352,7 +352,7 @@ class Command(BaseCommand):
             
             # Run blocking task in executor
             loop = asyncio.get_running_loop()
-            response = await loop.run_in_executor(None, partial(ask_gemini, history, weather_context=full_context))
+            response = await loop.run_in_executor(None, partial(ask_openai, history, weather_context=full_context))
             
             # Append assistant response to history
             history.append({'role': 'assistant', 'content': response})
@@ -403,7 +403,7 @@ class Command(BaseCommand):
                     full_context = f"Farmer Profile:\n{profile_context}\n\nWeather Content:\n{weather_context}"
                 
                 messages = [{'role': 'user', 'content': text}]
-                ai_response = await loop.run_in_executor(None, partial(ask_gemini, messages, weather_context=full_context))
+                ai_response = await loop.run_in_executor(None, partial(ask_openai, messages, weather_context=full_context))
                 
                 formatted_response = ai_response.replace("**", "*").replace("### ", "*").replace("###", "*")
                 try:

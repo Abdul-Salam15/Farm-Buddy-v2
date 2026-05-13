@@ -38,58 +38,91 @@ INSTRUCTIONS:
 1. Always tailor your advice to the farmer's specific soil type, location,
    water source and crops listed above.
 
-2. When your answer is informed by the farmer's profile or a past conversation,
-   end your response with a section formatted EXACTLY like this:
+2. EVERY response MUST end with a [FARMBUDDY_REFS] ... [/FARMBUDDY_REFS]
+   block citing where the information came from. This is mandatory — never
+   omit it, even for greetings or small talk.
+
+   Use one or more of these reference types, with the exact format
+   "TYPE:KEY — explanation" (em-dash, not hyphen):
+
+   - PROFILE:<field_key> — when you used the farmer's profile. The field_key
+     MUST match a row from the FARMER PROFILE above. Valid keys include:
+     first_name, last_name, location, farm_size_acres, soil_type, ph_level,
+     water_source, current_crops, past_crops, top_pests, livestock_types.
+   - HISTORY:Past-N — when you referenced a past conversation (Past-1, Past-2, ...).
+   - WEATHER:OpenWeatherMap — when weather data informed the answer.
+   - KNOWLEDGE:general — fallback for greetings, small talk, or general
+     agricultural advice not tied to the profile, history, or weather.
+
+   Concrete examples:
 
    [FARMBUDDY_REFS]
+   - PROFILE:location — Your farm is in Ibadan, as stored in your profile.
    - PROFILE:soil_type — Because your soil is loamy, I recommended...
    - HISTORY:Past-2 — Based on our earlier discussion about maize pests...
+   - WEATHER:OpenWeatherMap — Live forecast shows rain on Thursday.
+   - KNOWLEDGE:general — Standard agronomy advice for transplanting seedlings.
    [/FARMBUDDY_REFS]
 
-3. If no profile or history is relevant, omit the [FARMBUDDY_REFS] section.
-4. Keep language simple. Avoid jargon. Speak as a trusted advisor would.
-5. If the farmer is using voice, keep responses concise (under 120 words).
+   Include EVERY source you actually used. If nothing else applies (e.g. a
+   greeting like "hello"), still emit the block with a single
+   KNOWLEDGE:general line.
+
+3. Keep language simple. Avoid jargon. Speak as a trusted advisor would.
+4. If the farmer is using voice, keep responses concise (under 120 words),
+   but still include the [FARMBUDDY_REFS] block.
 """
 
     return system_prompt
+
+
+_DEFAULT_KNOWLEDGE_REF = {
+    'type': 'knowledge',
+    'key': 'general',
+    'explanation': 'General agricultural knowledge.'
+}
 
 
 def parse_xai_refs(response_text):
     """Extract the [FARMBUDDY_REFS] block from the AI response.
 
     Returns (clean_text, refs_list) where refs_list is a list of dicts:
-      {'type': 'profile'|'history', 'key': 'soil_type'|'Past-1', 'explanation': '...'}
+      {'type': 'profile'|'history'|'weather'|'image'|'knowledge',
+       'key': 'soil_type'|'Past-1'|'OpenWeatherMap'|...,
+       'explanation': '...'}
+
+    If the model omitted the block or it parsed to nothing, returns a single
+    fallback knowledge ref so the UI always shows a Sources & Context section.
     """
     refs = []
-    if '[FARMBUDDY_REFS]' not in response_text:
-        return response_text, refs
+    clean_text = response_text
 
-    # Require both the opening AND closing tag to avoid swallowing the entire response
-    if '[/FARMBUDDY_REFS]' not in response_text:
-        return response_text, refs
+    if '[FARMBUDDY_REFS]' in response_text and '[/FARMBUDDY_REFS]' in response_text:
+        parts = response_text.split('[FARMBUDDY_REFS]')
+        clean_text = parts[0].strip()
+        ref_block = parts[1].split('[/FARMBUDDY_REFS]')[0]
 
-    parts = response_text.split('[FARMBUDDY_REFS]')
-    clean_text = parts[0].strip()
-    ref_block = parts[1].split('[/FARMBUDDY_REFS]')[0]
+        for line in ref_block.strip().splitlines():
+            line = line.strip().lstrip('- ').strip()
+            if not line or ':' not in line:
+                continue
+            # Split on first '—' em-dash if present to get explanation
+            if '—' in line:
+                left, explanation = line.split('—', 1)
+            else:
+                left, explanation = line, ''
+            ref_type_key = left.strip()
+            if ':' in ref_type_key:
+                ref_type, ref_key = ref_type_key.split(':', 1)
+            else:
+                ref_type, ref_key = ('unknown', ref_type_key)
+            refs.append({
+                'type': ref_type.strip().lower(),
+                'key': ref_key.strip(),
+                'explanation': explanation.strip()
+            })
 
-    for line in ref_block.strip().splitlines():
-        line = line.strip().lstrip('- ').strip()
-        if not line or ':' not in line:
-            continue
-        # Split on first '—' em-dash if present to get explanation
-        if '—' in line:
-            left, explanation = line.split('—', 1)
-        else:
-            left, explanation = line, ''
-        ref_type_key = left.strip()
-        if ':' in ref_type_key:
-            ref_type, ref_key = ref_type_key.split(':', 1)
-        else:
-            ref_type, ref_key = ('unknown', ref_type_key)
-        refs.append({
-            'type': ref_type.strip().lower(),
-            'key': ref_key.strip(),
-            'explanation': explanation.strip()
-        })
+    if not refs:
+        refs = [dict(_DEFAULT_KNOWLEDGE_REF)]
 
     return clean_text, refs

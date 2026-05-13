@@ -21,6 +21,33 @@ from accounts.models import FarmerProfile
 from chat.models import Conversation, Message
 from utils.openai_api import ask_openai, analyze_plant_image, respond_to_voice
 from utils.weather_api import get_forecast_by_city
+from chat.context_builder import parse_xai_refs
+
+
+_REF_LABELS = {
+    'profile':   '👤 Profile',
+    'history':   '💬 Past chat',
+    'weather':   '🌦️ OpenWeatherMap',
+    'image':     '📸 Uploaded photo',
+    'knowledge': '🌱 General knowledge',
+}
+
+
+def _format_refs_md(refs):
+    """Format a refs list as a Markdown 'Sources & Context' section for Telegram."""
+    if not refs:
+        return ''
+    lines = []
+    for r in refs:
+        label = _REF_LABELS.get(r.get('type', ''), r.get('type', 'Source').title())
+        key = r.get('key', '')
+        explanation = r.get('explanation', '')
+        # Escape underscores in keys for Markdown safety
+        safe_key = str(key).replace('_', r'\_')
+        lines.append(f"• _{label} ({safe_key}):_ {explanation}")
+    return "\n\n*Sources & Context*\n" + "\n".join(lines)
+
+
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import check_password as check_hashed_password
@@ -95,8 +122,11 @@ def db_get_or_create_conv(user):
     return conv
 
 @_db
-def db_save_msg(conv, role, content):
-    msg = Message.objects.create(conversation=conv, role=role, content=content)
+def db_save_msg(conv, role, content, references=None):
+    msg = Message.objects.create(
+        conversation=conv, role=role, content=content,
+        references=references or [],
+    )
     Conversation.objects.filter(pk=conv.pk).update(updated_at=timezone.now())
     return msg
 
@@ -1085,13 +1115,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # 3. Ask OpenAI with profile context
         await update.message.chat.send_action("typing")
-        response_text = await sync_to_async(ask_openai)(history, profile_context=profile_context, language=lang)
-        
-        # 4. Save Assistant reply
-        await sync_to_async(db_save_msg)(conv, 'assistant', response_text)
-        
-        # 5. Reply to User
-        await update.message.reply_text(response_text, parse_mode='Markdown')
+        raw_response = await sync_to_async(ask_openai)(history, profile_context=profile_context, language=lang)
+
+        # 4. Parse refs and build display reply
+        clean_text, refs = parse_xai_refs(raw_response)
+        reply_text = clean_text + _format_refs_md(refs)
+
+        # 5. Save Assistant reply (clean text only; refs stored separately)
+        await sync_to_async(db_save_msg)(conv, 'assistant', clean_text, refs)
+
+        # 6. Reply to User
+        await update.message.reply_text(reply_text, parse_mode='Markdown')
     else:
         await update.message.reply_text("❌ Your account is not linked. Please use /start with your token from the FarmBuddy website.")
 
@@ -1103,33 +1137,41 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         info = await sync_to_async(db_get_profile_info)(chat_id)
         if info:
             user = info['user_obj']
+            profile = info['profile_obj']
             lang = info['lang']
             l = get_localized_labels(lang)
-            
+
             # Download photo
             photo_file = await update.message.photo[-1].get_file()
-            
+
             with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
                 await photo_file.download_to_drive(tmp.name)
                 tmp_path = tmp.name
-            
+
             await update.message.reply_text(l['analyzing_photo'])
             await update.message.chat.send_action("upload_photo")
-            
+
+            # Pass profile context so the vision model can cite profile fields
+            profile_context = await sync_to_async(profile.to_context_string)()
+
             # Analyze using OpenAI Vision
-            analysis_result = analyze_plant_image(tmp_path)
-            
+            analysis_result = await sync_to_async(analyze_plant_image)(tmp_path, system_context=profile_context)
+
             # Clean up
             import os
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
-                
+
+            # Parse refs and build display reply
+            clean_text, refs = parse_xai_refs(analysis_result)
+            reply_text = clean_text + _format_refs_md(refs)
+
             # Sync to DB
             conv = await sync_to_async(db_get_or_create_conv)(user)
             await sync_to_async(db_save_msg)(conv, 'user', "[Uploaded a leaf photo for diagnosis]")
-            await sync_to_async(db_save_msg)(conv, 'assistant', analysis_result)
-            
-            await update.message.reply_text(analysis_result, parse_mode='Markdown')
+            await sync_to_async(db_save_msg)(conv, 'assistant', clean_text, refs)
+
+            await update.message.reply_text(reply_text, parse_mode='Markdown')
         else:
             await update.message.reply_text("❌ Account not linked.")
     except Exception as e:
@@ -1166,13 +1208,17 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await sync_to_async(db_save_msg)(conv, 'user', "[Sent a voice note]")
 
                 # 2. Ask OpenAI to listen and respond
-                response_text = await sync_to_async(respond_to_voice)(tmp_path, mime_type, lang)
+                raw_response = await sync_to_async(respond_to_voice)(tmp_path, mime_type, lang)
 
-                # 3. Save assistant reply
-                await sync_to_async(db_save_msg)(conv, 'assistant', response_text)
+                # 3. Parse refs and build display reply
+                clean_text, refs = parse_xai_refs(raw_response)
+                reply_text = clean_text + _format_refs_md(refs)
 
-                # 4. Reply
-                await update.message.reply_text(response_text, parse_mode='Markdown')
+                # 4. Save assistant reply
+                await sync_to_async(db_save_msg)(conv, 'assistant', clean_text, refs)
+
+                # 5. Reply
+                await update.message.reply_text(reply_text, parse_mode='Markdown')
             finally:
                 import os
                 if os.path.exists(tmp_path):

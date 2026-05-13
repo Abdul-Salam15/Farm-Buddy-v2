@@ -79,6 +79,10 @@
     "sources_header": "Rehani & Bayani",
     "source_profile": "Daga Bayanan Gonarka",
     "source_conversation": "Ci gaban Hira",
+    "source_weather": "Bayanan Yanayi (OpenWeatherMap)",
+    "source_image": "Hoton Tsiron da Aka Ɗora",
+    "source_knowledge": "Sanin Noma na Gama-gari",
+    "source_weather_explanation": "Bayanan yanayi kai tsaye don {location} daga OpenWeatherMap.",
     "input_placeholder_alt": "Rubuta, yi magana, ko ɗora hoto..."
   },
   "profile": {

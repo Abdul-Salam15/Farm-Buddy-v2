@@ -550,13 +550,19 @@ export default function ChatPage() {
         const data = await res.json()
         if (data.success) {
           setWeatherData(data.data)
+          const cityName = data.data?.current?.name || `${latitude.toFixed(2)}, ${longitude.toFixed(2)}`
           setMessages(prev => [...prev, {
             id: Date.now(),
             role: "assistant",
             content: t("chat.weather_update", {
               description: data.data.current.weather[0].description,
               temp: Math.round(data.data.current.main.temp)
-            })
+            }),
+            references: [{
+              type: 'weather',
+              key: 'OpenWeatherMap',
+              explanation: t("chat.source_weather_explanation", { location: cityName })
+            }]
           }])
         }
       } catch (err) {
@@ -1292,17 +1298,27 @@ export default function ChatPage() {
                               <p className="text-[11px] font-bold uppercase tracking-widest text-primary">{t('chat.sources_header')}</p>
                             </div>
                             <ul className="space-y-3">
-                              {message.references.map((ref: any, idx: number) => (
-                                <li key={idx} className="text-[12px] leading-relaxed text-muted-foreground flex gap-3 group">
-                                  <div className="shrink-0 mt-1 h-1.5 w-1.5 rounded-full bg-primary/40 group-hover:bg-primary/60 transition-colors" />
-                                  <span>
-                                    <strong className="text-foreground/80 font-bold uppercase text-[10px] block mb-0.5 tracking-tight">
-                                      {ref.type === 'profile' ? t('chat.source_profile') : t('chat.source_conversation')} ({ref.key}):
-                                    </strong>{" "}
-                                    {ref.explanation}
-                                  </span>
-                                </li>
-                              ))}
+                              {message.references.map((ref: any, idx: number) => {
+                                const labelKey = (
+                                  ref.type === 'profile' ? 'chat.source_profile' :
+                                  ref.type === 'history' ? 'chat.source_conversation' :
+                                  ref.type === 'weather' ? 'chat.source_weather' :
+                                  ref.type === 'image' ? 'chat.source_image' :
+                                  ref.type === 'knowledge' ? 'chat.source_knowledge' :
+                                  'chat.source_conversation'
+                                )
+                                return (
+                                  <li key={idx} className="text-[12px] leading-relaxed text-muted-foreground flex gap-3 group">
+                                    <div className="shrink-0 mt-1 h-1.5 w-1.5 rounded-full bg-primary/40 group-hover:bg-primary/60 transition-colors" />
+                                    <span>
+                                      <strong className="text-foreground/80 font-bold uppercase text-[10px] block mb-0.5 tracking-tight">
+                                        {t(labelKey)} ({ref.key}):
+                                      </strong>{" "}
+                                      {ref.explanation}
+                                    </span>
+                                  </li>
+                                )
+                              })}
                             </ul>
                           </div>
                         )}

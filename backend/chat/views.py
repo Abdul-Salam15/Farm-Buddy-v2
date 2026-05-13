@@ -149,9 +149,7 @@ def send_message(request):
                     weather_context = ''
                     request.session.pop('weather_context', None)
                     request.session.pop('weather_context_ts', None)
-                combined_context = system_prompt + "\n\n" + weather_context if system_prompt else weather_context
-
-                stream = ask_gemini(messages_history, weather_context=combined_context, stream=True, language=language)
+                stream = ask_gemini(messages_history, weather_context=weather_context, profile_context=system_prompt, stream=True, language=language)
                 
                 for chunk in stream:
                     full_response += chunk

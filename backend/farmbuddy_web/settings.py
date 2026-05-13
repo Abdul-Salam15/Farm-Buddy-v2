@@ -77,6 +77,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
+    'cloudinary_storage',
+    'cloudinary',
     'accounts',
     'chat',
     'telegram_bot',
@@ -258,6 +260,21 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # Media files (user uploads)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Cloudinary storage for uploaded media (plant photos).
+# When the three env vars are present, media uploads go to Cloudinary so they
+# survive Render's ephemeral filesystem redeploys. Otherwise we fall back to
+# local disk so dev setups without Cloudinary keep working.
+_CLOUDINARY_NAME = os.getenv('CLOUDINARY_CLOUD_NAME', '')
+_CLOUDINARY_KEY = os.getenv('CLOUDINARY_API_KEY', '')
+_CLOUDINARY_SECRET = os.getenv('CLOUDINARY_API_SECRET', '')
+if _CLOUDINARY_NAME and _CLOUDINARY_KEY and _CLOUDINARY_SECRET:
+    CLOUDINARY_STORAGE = {
+        'CLOUD_NAME': _CLOUDINARY_NAME,
+        'API_KEY': _CLOUDINARY_KEY,
+        'API_SECRET': _CLOUDINARY_SECRET,
+    }
+    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

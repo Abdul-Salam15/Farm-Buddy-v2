@@ -216,23 +216,26 @@ class Command(BaseCommand):
     async def handle_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = update.effective_chat.id
         photo = update.message.photo[-1] # Get highest resolution
-        
+
         await context.bot.send_chat_action(chat_id=chat_id, action='typing')
-        
+        loop = asyncio.get_running_loop()
+        file_path = None
         try:
             file = await context.bot.get_file(photo.file_id)
             file_path = f"photo_{chat_id}_{photo.file_unique_id}.jpg"
             await file.download_to_drive(file_path)
-            
+
             await context.bot.send_message(chat_id, "🔍 Analyzing image...")
-            
+
             # Check for history
             history = self.user_sessions.get(chat_id, {}).get('history', [])
-            
+
             # Load context
             from asgiref.sync import sync_to_async
             from accounts.models import FarmerProfile
-            
+            from chat.models import Conversation, Message
+            from django.core.files import File
+
             profile = None
             try:
                 profile = await sync_to_async(FarmerProfile.objects.get)(telegram_chat_id=chat_id)
@@ -250,6 +253,25 @@ class Command(BaseCommand):
             # Parse refs from the vision response
             clean_text, refs = parse_xai_refs(raw_response)
 
+            # Persist to DB so the web app can render the photo + diagnosis.
+            # With Cloudinary configured, Message.image gets pushed to the CDN.
+            if profile:
+                def _save_photo_messages():
+                    conv, _ = Conversation.objects.get_or_create(
+                        user=profile.user, title="Telegram Chat",
+                    )
+                    with open(file_path, 'rb') as fh:
+                        Message.objects.create(
+                            conversation=conv, role='user',
+                            content='[Sent a photo for analysis]',
+                            image=File(fh, name=os.path.basename(file_path)),
+                        )
+                    Message.objects.create(
+                        conversation=conv, role='assistant',
+                        content=clean_text, references=refs or [],
+                    )
+                await sync_to_async(_save_photo_messages)()
+
             # Add to history (Multimodal history is tricky in simple list, just add text summary for now)
             history.append({'role': 'user', 'content': '[Sent a photo for analysis]'})
             history.append({'role': 'assistant', 'content': clean_text})
@@ -266,11 +288,11 @@ class Command(BaseCommand):
             except Exception:
                 # Fallback if markdown still fails
                 await context.bot.send_message(chat_id=chat_id, text=clean_text + _format_refs_md(refs))
-                
+
         except Exception as e:
             await context.bot.send_message(chat_id=chat_id, text=f"Error analyzing photo: {str(e)}")
         finally:
-            if os.path.exists(file_path): os.remove(file_path)
+            if file_path and os.path.exists(file_path): os.remove(file_path)
 
     async def handle_location(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = update.effective_chat.id

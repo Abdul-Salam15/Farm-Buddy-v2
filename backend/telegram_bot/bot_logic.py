@@ -122,11 +122,16 @@ def db_get_or_create_conv(user):
     return conv
 
 @_db
-def db_save_msg(conv, role, content, references=None):
-    msg = Message.objects.create(
-        conversation=conv, role=role, content=content,
-        references=references or [],
-    )
+def db_save_msg(conv, role, content, references=None, image=None):
+    kwargs = {
+        'conversation': conv,
+        'role': role,
+        'content': content,
+        'references': references or [],
+    }
+    if image is not None:
+        kwargs['image'] = image
+    msg = Message.objects.create(**kwargs)
     Conversation.objects.filter(pk=conv.pk).update(updated_at=timezone.now())
     return msg
 
@@ -1157,19 +1162,27 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Analyze using OpenAI Vision
             analysis_result = await sync_to_async(analyze_plant_image)(tmp_path, system_context=profile_context)
 
-            # Clean up
-            import os
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-
             # Parse refs and build display reply
             clean_text, refs = parse_xai_refs(analysis_result)
             reply_text = clean_text + _format_refs_md(refs)
 
-            # Sync to DB
+            # Sync to DB — save the photo into Message.image so the web app
+            # can render it. Done before tmp-file cleanup; with Cloudinary
+            # configured this pushes the image to the CDN.
+            from django.core.files import File
             conv = await sync_to_async(db_get_or_create_conv)(user)
-            await sync_to_async(db_save_msg)(conv, 'user', "[Uploaded a leaf photo for diagnosis]")
+            import os
+            with open(tmp_path, 'rb') as fh:
+                django_image = File(fh, name=os.path.basename(tmp_path))
+                await sync_to_async(db_save_msg)(
+                    conv, 'user', "[Uploaded a leaf photo for diagnosis]",
+                    image=django_image,
+                )
             await sync_to_async(db_save_msg)(conv, 'assistant', clean_text, refs)
+
+            # Clean up temp file
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
 
             await update.message.reply_text(reply_text, parse_mode='Markdown')
         else:

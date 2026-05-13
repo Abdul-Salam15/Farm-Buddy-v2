@@ -20,6 +20,7 @@ from django.views.generic import TemplateView, RedirectView
 from django.http import JsonResponse
 import os
 from django.conf import settings
+from django.conf.urls.static import static
 
 
 def health_check(request):
@@ -34,4 +35,4 @@ urlpatterns = [
     path('sw.js', TemplateView.as_view(template_name='sw.js', content_type='application/javascript')),
     path('manifest.json', TemplateView.as_view(template_name='manifest.json', content_type='application/json')),
     path('', RedirectView.as_view(url='/chat/', permanent=False)),
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

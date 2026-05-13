@@ -354,7 +354,18 @@ def upload_image(request):
         except Exception:
             # If compression fails, fall through with the original file
             image_file.seek(0)
-        
+
+        # Write image bytes to a temp file for Vision analysis (works with any
+        # storage backend including Cloudinary, which has no local .path).
+        import tempfile as _tempfile
+        image_file.seek(0)
+        _tmp_image = _tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
+        _tmp_image.write(image_file.read())
+        _tmp_image.flush()
+        _tmp_image.close()
+        image_path = _tmp_image.name
+        image_file.seek(0)
+
         # Get current conversation — enforce ownership
         conversation_id = request.POST.get('conversation_id') or request.session.get('conversation_id')
         try:
@@ -397,9 +408,7 @@ def upload_image(request):
             content=text_content,
             image=image_file
         )
-            # Get the saved image path
-        image_path = user_message.image.path
-        
+
         from django.http import StreamingHttpResponse
 
         # Build context for vision analysis
@@ -447,6 +456,10 @@ def upload_image(request):
             except Exception as e:
                 print(f"Error in vision stream: {e}")
                 yield json.dumps({'success': False, 'error': str(e)}) + "\n"
+            finally:
+                import os as _os
+                if _os.path.exists(image_path):
+                    _os.remove(image_path)
 
         return StreamingHttpResponse(vision_response_generator(), content_type='application/x-ndjson')
         

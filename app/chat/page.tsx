@@ -636,19 +636,17 @@ export default function ChatPage() {
     if (target) loadConversation(target.id)
   }, [conversations])
 
-  // Poll for new messages every 10 s when viewing Telegram Chat
+  // Poll every 8s to sync messages across devices and Telegram
   useEffect(() => {
     if (!currentConvId) return
-    const currentConv = conversations.find(c => c.id === currentConvId)
-    if (currentConv?.title !== 'Telegram Chat') return
 
     const interval = setInterval(() => {
       silentRefreshMessages(currentConvId)
       fetchConversations()
-    }, 10000)
+    }, 8000)
 
     return () => clearInterval(interval)
-  }, [currentConvId, conversations, silentRefreshMessages, fetchConversations])
+  }, [currentConvId, silentRefreshMessages, fetchConversations])
 
   const handleSend = async (overrideText?: string) => {
     const textToSend = overrideText !== undefined ? overrideText : inputValue

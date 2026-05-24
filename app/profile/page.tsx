@@ -265,7 +265,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       <Header isAuthenticated />
 
       <main className="container mx-auto px-4 py-8">
@@ -325,10 +325,10 @@ export default function ProfilePage() {
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                     <Sprout className="h-5 w-5 text-primary" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <CardTitle>{t('profile.edit_farm_data')}</CardTitle>
                     <CardDescription>
                       {t('profile.update_info')}
@@ -481,7 +481,7 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="top_pests">{t('profile.common_pests')}</Label>
+                      <Label htmlFor="top_pests">{t('profile.main_pests')}</Label>
                       <Textarea
                         id="top_pests"
                         value={profileData.top_pests}
@@ -526,18 +526,20 @@ export default function ProfilePage() {
                   <div className="space-y-2">
                     <Label htmlFor="telegram_link_token">Telegram Link Token</Label>
                     <div className="flex gap-2">
-                      <Input
-                        id="telegram_link_token"
-                        value={profileData.telegram_link_token || "Already Linked"}
-                        className="font-mono text-sm flex-1"
-                        readOnly
-                      />
-                      <Button 
-                        type="button" 
-                        variant="outline" 
+                      <div className="min-w-0 flex-1">
+                        <Input
+                          id="telegram_link_token"
+                          value={profileData.telegram_link_token || "Already Linked"}
+                          className="font-mono text-sm w-full"
+                          readOnly
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
                         onClick={handleOpenTelegram}
                         disabled={!profileData.telegram_link_token}
-                        className="gap-2"
+                        className="gap-2 shrink-0"
                       >
                         <MessageCircle className="h-4 w-4" />
                         Open Bot
@@ -585,7 +587,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <div className="h-44 w-full relative">
+                <div className="h-44 w-full relative overflow-hidden">
                   {isWeatherLoading && (
                     <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/50 backdrop-blur-sm">
                       <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -650,31 +652,24 @@ export default function ProfilePage() {
                   )}
                 </div>
 
-                <div className="mt-5 grid grid-cols-3 gap-2">
-                  <div className="rounded-xl bg-muted/50 p-3 text-center">
+                <div className="mt-5 grid grid-cols-2 gap-2">
+                  <div className="rounded-xl bg-muted/50 p-3 text-center overflow-hidden">
                     <Thermometer className="mx-auto h-4 w-4 text-orange-500" />
-                    <p className="mt-1.5 text-lg font-semibold">
-                      {weatherData.length > 0 
-                        ? `${Math.round(weatherData.reduce((acc, curr) => acc + curr.temperature, 0) / weatherData.length)}°C` 
+                    <p className="mt-1.5 text-lg font-semibold truncate">
+                      {weatherData.length > 0
+                        ? `${Math.round(weatherData.reduce((acc, curr) => acc + curr.temperature, 0) / weatherData.length)}°C`
                         : "--"}
                     </p>
-                    <p className="text-xs text-muted-foreground">{t('profile.avg_temp')}</p>
+                    <p className="text-xs text-muted-foreground truncate">{t('profile.avg_temp')}</p>
                   </div>
-                  <div className="rounded-xl bg-muted/50 p-3 text-center">
+                  <div className="rounded-xl bg-muted/50 p-3 text-center overflow-hidden">
                     <Droplets className="mx-auto h-4 w-4 text-blue-500" />
-                    <p className="mt-1.5 text-lg font-semibold">
-                      {weatherData.length > 0 
-                        ? `${Math.round(weatherData.reduce((acc, curr) => acc + curr.humidity, 0) / weatherData.length)}%` 
+                    <p className="mt-1.5 text-lg font-semibold truncate">
+                      {weatherData.length > 0
+                        ? `${Math.round(weatherData.reduce((acc, curr) => acc + curr.humidity, 0) / weatherData.length)}%`
                         : "--"}
                     </p>
-                    <p className="text-xs text-muted-foreground">{t('profile.humidity')}</p>
-                  </div>
-                  <div className="rounded-xl bg-muted/50 p-3 text-center">
-                    <TrendingUp className="mx-auto h-4 w-4 text-primary" />
-                    <p className="mt-1.5 text-lg font-semibold">
-                      {weatherData.length > 0 ? t('profile.outlook_good') : "--"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{t('profile.outlook')}</p>
+                    <p className="text-xs text-muted-foreground truncate">{t('profile.humidity')}</p>
                   </div>
                 </div>
               </CardContent>

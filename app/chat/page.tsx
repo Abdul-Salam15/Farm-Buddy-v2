@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import {
   Send,
+  Square,
   Plus,
   MessageSquare,
   Sprout,
@@ -127,6 +128,7 @@ export default function ChatPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const ttsAbortRef = useRef<AbortController | null>(null)
+  const chatAbortRef = useRef<AbortController | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const speechResultRef = useRef('')
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -671,6 +673,9 @@ export default function ChatPage() {
     isAutoScrollingRef.current = true // Force auto-scroll for new user message
     setTimeout(() => scrollToBottom(true), 50)
 
+    const abort = new AbortController()
+    chatAbortRef.current = abort
+
     try {
       let response;
       if (imageToSend) {
@@ -682,6 +687,7 @@ export default function ChatPage() {
         response = await fetch(`${API_BASE}/upload/`, {
           method: "POST",
           credentials: 'include',
+          signal: abort.signal,
           body: formData,
         })
       } else {
@@ -689,6 +695,7 @@ export default function ChatPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: 'include',
+          signal: abort.signal,
           body: JSON.stringify({
             message: messageToSend,
             conversation_id: currentConvId,
@@ -740,7 +747,8 @@ export default function ChatPage() {
           }
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.name === 'AbortError') return
       console.error("Chat error:", error)
       setMessages(prev => [...prev, {
         id: Date.now() + 2,
@@ -748,8 +756,14 @@ export default function ChatPage() {
         content: t("chat.error_server")
       }])
     } finally {
+      chatAbortRef.current = null
       setIsLoading(false)
     }
+  }
+
+  const handleStop = () => {
+    chatAbortRef.current?.abort()
+    chatAbortRef.current = null
   }
 
   const handleNewChat = async () => {
@@ -1407,14 +1421,25 @@ export default function ChatPage() {
                     className="h-12 w-full rounded-xl border-border bg-background pr-4 pl-4 text-foreground placeholder:text-muted-foreground"
                   />
                 </div>
-                <Button
-                  type="submit"
-                  disabled={(!inputValue.trim() && !selectedImage) || isLoading}
-                  size="icon"
-                  className="h-12 w-12 shrink-0 rounded-xl"
-                >
-                  <Send className="h-5 w-5" />
-                </Button>
+                {isLoading ? (
+                  <Button
+                    type="button"
+                    onClick={handleStop}
+                    size="icon"
+                    className="h-12 w-12 shrink-0 rounded-xl bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                  >
+                    <Square className="h-5 w-5 fill-current" />
+                  </Button>
+                ) : (
+                  <Button
+                    type="submit"
+                    disabled={!inputValue.trim() && !selectedImage}
+                    size="icon"
+                    className="h-12 w-12 shrink-0 rounded-xl"
+                  >
+                    <Send className="h-5 w-5" />
+                  </Button>
+                )}
               </form>
               {/* Mobile recording / transcribing indicator */}
               {(isRecording || isTranscribing) && (

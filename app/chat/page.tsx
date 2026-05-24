@@ -121,6 +121,7 @@ export default function ChatPage() {
   const [editingConvId, setEditingConvId] = useState<number | null>(null)
   const [editingTitle, setEditingTitle] = useState("")
   const [searchText, setSearchText] = useState("")
+  const [activeSearch, setActiveSearch] = useState("")
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recognitionRef = useRef<any>(null)
@@ -894,12 +895,7 @@ export default function ChatPage() {
       <div className="px-4 pb-3">
         <form onSubmit={(e) => {
           e.preventDefault()
-          if (searchText.trim()) {
-            const query = searchText.trim()
-            setSearchText("")
-            setSidebarOpen(false)
-            handleSend(query)
-          }
+          setActiveSearch(searchText.trim())
         }}>
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-sidebar-foreground/40 pointer-events-none" />
@@ -908,13 +904,13 @@ export default function ChatPage() {
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               enterKeyHint="search"
-              placeholder="Ask FarmBuddy..."
+              placeholder="Search conversations..."
               className="w-full rounded-lg border border-sidebar-border bg-sidebar-accent/40 py-2 pl-8 pr-3 text-sm text-sidebar-foreground placeholder:text-sidebar-foreground/40 outline-none focus:border-primary/50 focus:bg-sidebar-accent/60 transition-colors"
             />
-            {searchText && (
+            {(searchText || activeSearch) && (
               <button
                 type="button"
-                onClick={() => setSearchText("")}
+                onClick={() => { setSearchText(""); setActiveSearch("") }}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sidebar-foreground/40 hover:text-sidebar-foreground"
               >
                 <X className="h-3.5 w-3.5" />
@@ -929,8 +925,13 @@ export default function ChatPage() {
           {t("chat.recent")}
         </p>
         <div className="space-y-1">
-          {conversations.length > 0 ? (
-            conversations.map((conv) => (
+          {(() => {
+            const displayedConversations = activeSearch
+              ? conversations.filter(c =>
+                  c.title.toLowerCase().includes(activeSearch.toLowerCase())
+                )
+              : conversations
+            if (displayedConversations.length > 0) return displayedConversations.map((conv) => (
               <div key={conv.id} className="group relative">
                 {editingConvId === conv.id ? (
                   <form
@@ -1023,11 +1024,17 @@ export default function ChatPage() {
                 )}
               </div>
             ))
-          ) : (
-            <p className="py-8 text-center text-sm text-sidebar-foreground/40">
-              {t("chat.no_conversations")}
-            </p>
-          )}
+            if (activeSearch) return (
+              <p className="py-8 text-center text-sm text-sidebar-foreground/40">
+                No conversations found
+              </p>
+            )
+            return (
+              <p className="py-8 text-center text-sm text-sidebar-foreground/40">
+                {t("chat.no_conversations")}
+              </p>
+            )
+          })()}
         </div>
 
       </div>

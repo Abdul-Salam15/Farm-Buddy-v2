@@ -321,7 +321,7 @@ export default function ProfilePage() {
 
         <div className="grid gap-8 lg:grid-cols-3">
           {/* Farm Data Form */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 min-w-0 w-full overflow-hidden">
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-3">
@@ -340,13 +340,13 @@ export default function ProfilePage() {
                 <form onSubmit={handleSave} className="space-y-6">
                   {/* Basic Info */}
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="preferred_language">{t('profile.lang_pref')}</Label>
                       <Select 
                         value={profileData.preferred_language} 
                         onValueChange={(val) => handleSelectChange('preferred_language', val)}
                       >
-                        <SelectTrigger id="preferred_language">
+                        <SelectTrigger id="preferred_language" className="w-full">
                           <SelectValue placeholder={t('profile.lang_pref')} />
                         </SelectTrigger>
                         <SelectContent>
@@ -358,11 +358,11 @@ export default function ProfilePage() {
                       </Select>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="first_name">{t('profile.first_name')}</Label>
                       <Input id="first_name" value={profileData.first_name} onChange={handleInputChange} />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="last_name">{t('profile.last_name')}</Label>
                       <Input id="last_name" value={profileData.last_name} onChange={handleInputChange} />
                     </div>
@@ -370,7 +370,7 @@ export default function ProfilePage() {
 
                   {/* Location */}
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="location">{t('profile.farm_location')}</Label>
                       <Input
                         id="location"
@@ -383,7 +383,7 @@ export default function ProfilePage() {
                       </p>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="farm_size_acres">{t('profile.farm_size')}</Label>
                       <Input
                         id="farm_size_acres"
@@ -397,13 +397,13 @@ export default function ProfilePage() {
 
                   {/* Soil */}
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="soil_type">{t('profile.soil_appearance')}</Label>
                       <Select 
                         value={profileData.soil_type} 
                         onValueChange={(val) => handleSelectChange('soil_type', val)}
                       >
-                        <SelectTrigger id="soil_type">
+                        <SelectTrigger id="soil_type" className="w-full">
                           <SelectValue placeholder={t('profile.soil_appearance')} />
                         </SelectTrigger>
                         <SelectContent>
@@ -416,13 +416,13 @@ export default function ProfilePage() {
                       </Select>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="ph_level">{t('profile.soil_acidity')}</Label>
                       <Select 
                         value={profileData.ph_level} 
                         onValueChange={(val) => handleSelectChange('ph_level', val)}
                       >
-                        <SelectTrigger id="ph_level">
+                        <SelectTrigger id="ph_level" className="w-full">
                           <SelectValue placeholder={t('profile.soil_acidity')} />
                         </SelectTrigger>
                         <SelectContent>
@@ -437,13 +437,13 @@ export default function ProfilePage() {
 
                   {/* Irrigation & Crops */}
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="water_source">{t('profile.irrigation_method')}</Label>
                       <Select 
                         value={profileData.water_source} 
                         onValueChange={(val) => handleSelectChange('water_source', val)}
                       >
-                        <SelectTrigger id="water_source">
+                        <SelectTrigger id="water_source" className="w-full">
                           <SelectValue placeholder={t('profile.irrigation_method')} />
                         </SelectTrigger>
                         <SelectContent>
@@ -454,7 +454,7 @@ export default function ProfilePage() {
                       </Select>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="current_crops">{t('profile.current_crops')}</Label>
                       <Input
                         id="current_crops"
@@ -470,7 +470,7 @@ export default function ProfilePage() {
 
                   {/* History */}
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="past_crops">{t('profile.previous_crops')}</Label>
                       <Input
                         id="past_crops"
@@ -480,7 +480,7 @@ export default function ProfilePage() {
                       />
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="top_pests">{t('profile.main_pests')}</Label>
                       <Textarea
                         id="top_pests"
@@ -495,13 +495,13 @@ export default function ProfilePage() {
 
                   {/* Animals */}
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="has_livestock">{t('profile.keep_animals')}</Label>
                       <Select 
                         value={profileData.has_livestock ? "yes" : "no"} 
                         onValueChange={(val) => handleSelectChange('has_livestock', val === "yes")}
                       >
-                        <SelectTrigger id="has_livestock">
+                        <SelectTrigger id="has_livestock" className="w-full">
                           <SelectValue placeholder={t('profile.keep_animals')} />
                         </SelectTrigger>
                         <SelectContent>
@@ -511,7 +511,7 @@ export default function ProfilePage() {
                       </Select>
                     </div>
                     {profileData.has_livestock && (
-                      <div className="space-y-2">
+                      <div className="space-y-2 min-w-0">
                         <Label htmlFor="livestock_types">{t('profile.what_animals')}</Label>
                         <Input
                           id="livestock_types"
@@ -566,7 +566,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
+          <div className="space-y-6 min-w-0 w-full overflow-hidden">
             {/* Weather Forecast */}
             <Card>
               <CardHeader className="pb-3">

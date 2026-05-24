@@ -1355,9 +1355,10 @@ export default function ChatPage() {
                 </div>
               )}
 
-              <div className="flex items-center gap-2">
+              <form onSubmit={(e) => { e.preventDefault(); handleSend() }} className="flex items-center gap-2">
                 <div className="hidden shrink-0 gap-1 sm:flex">
                   <Button
+                    type="button"
                     variant="ghost"
                     size="icon"
                     className="h-10 w-10 text-muted-foreground hover:text-foreground"
@@ -1366,6 +1367,7 @@ export default function ChatPage() {
                     <Cloud className="h-5 w-5" />
                   </Button>
                   <Button
+                    type="button"
                     variant="ghost"
                     size="icon"
                     className="h-10 w-10 text-muted-foreground hover:text-foreground"
@@ -1381,6 +1383,7 @@ export default function ChatPage() {
                     onChange={onImageSelect}
                   />
                   <Button
+                    type="button"
                     variant="ghost"
                     size="icon"
                     className={`h-10 w-10 ${isRecording ? 'text-red-500 bg-red-50' : 'text-muted-foreground'} hover:text-foreground`}
@@ -1401,19 +1404,20 @@ export default function ChatPage() {
                         handleSend()
                       }
                     }}
+                    enterKeyHint="send"
                     placeholder={isTranscribing ? "Transcribing..." : t('chat.input_placeholder_alt')}
                     className="h-12 w-full rounded-xl border-border bg-background pr-4 pl-4 text-foreground placeholder:text-muted-foreground"
                   />
                 </div>
                 <Button
-                  onClick={handleSend}
+                  type="submit"
                   disabled={(!inputValue.trim() && !selectedImage) || isLoading}
                   size="icon"
                   className="h-12 w-12 shrink-0 rounded-xl"
                 >
                   <Send className="h-5 w-5" />
                 </Button>
-              </div>
+              </form>
               {/* Mobile recording / transcribing indicator */}
               {(isRecording || isTranscribing) && (
                 <div className={`mt-3 flex items-center justify-center gap-2 rounded-lg px-3 py-2 sm:hidden border ${isTranscribing ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200'}`}>

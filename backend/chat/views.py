@@ -711,10 +711,10 @@ def speak_text(request):
             response['Cache-Control'] = 'private, max-age=86400'
             return response
 
-        # 5s connect timeout, 20s read timeout — prevents indefinite hangs
+        # 5s connect timeout, 45s read timeout — gives YarnGPT more time before fallback
         api_response = requests.post(
             YARNGPT_API_URL, headers=headers, json=payload,
-            timeout=(5, 20)
+            timeout=(5, 45)
         )
 
         if api_response.status_code == 200:

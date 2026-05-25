@@ -871,9 +871,11 @@ export default function ChatPage() {
     } catch (err: any) {
       if (err?.name === 'AbortError') return  // cancelled by user — no fallback
       setIsTTSLoading(false)
-      setIsSpeaking(null)
+      audioRef.current = null  // discard any partially-initialised audio element
       console.error("TTS API failed, falling back to SpeechSynthesis", err)
       speakWithBrowser(message.content)
+      // isSpeaking intentionally left as message.id so the button shows Pause;
+      // speakWithBrowser clears it via utterance.onend / utterance.onerror.
     }
   }
 

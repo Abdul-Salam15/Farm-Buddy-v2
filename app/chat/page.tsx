@@ -48,6 +48,7 @@ import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@/app/i18n/LanguageContext"
 import { API_BASE_URL } from "@/lib/config"
+import { useToast } from "@/hooks/use-toast"
 
 interface Message {
   id: string | number
@@ -372,6 +373,7 @@ function SidebarContent({
 
 export default function ChatPage() {
   const { t } = useTranslation()
+  const { toast } = useToast()
   const [messages, setMessages] = useState<Message[]>([])
   const [conversations, setConversations] = useState<ConversationItem[]>([])
   const [currentConvId, setCurrentConvId] = useState<number | null>(null)
@@ -679,13 +681,18 @@ export default function ChatPage() {
   };
 
   const speakWithBrowser = (text: string) => {
+    toast({
+      title: "Voice service unavailable",
+      description: "FarmBuddy's voice is temporarily unavailable. Using your device's default voice instead.",
+      variant: "destructive",
+      duration: 5000,
+    })
     if (!window.speechSynthesis) {
       setIsSpeaking(null)
       return
     }
     window.speechSynthesis.cancel()
     const utterance = new SpeechSynthesisUtterance(text)
-    // Best-effort language mapping for browser TTS voices
     const langMap: Record<string, string> = { en: 'en-US', ha: 'ha', ig: 'ig', yo: 'yo' }
     utterance.lang = langMap[preferredLanguage] || 'en-US'
     utterance.onend = () => { setIsSpeaking(null); setIsPaused(false) }

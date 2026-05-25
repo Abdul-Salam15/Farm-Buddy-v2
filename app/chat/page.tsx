@@ -404,6 +404,7 @@ export default function ChatPage() {
   const speechResultRef = useRef('')
   const audioContextRef = useRef<AudioContext | null>(null)
   const audioCacheRef = useRef<Map<string, Blob>>(new Map())
+  const prefetchInflightRef = useRef<Map<string, Promise<Blob | null>>>(new Map())
   const isAutoScrollingRef = useRef(true)
   const hasRestoredConvRef = useRef(false)
   const scrollToMessageRef = useRef<string | number | null>(null)
@@ -453,6 +454,17 @@ export default function ChatPage() {
       scrollToBottom()
     }
   }, [messages, scrollToBottom])
+
+  // Warm the TTS cache for the most recent assistant messages so the first
+  // Listen click is instant. Skipped while a response is still streaming.
+  // Limited to the last 3 to avoid hammering YarnGPT on long history loads.
+  useEffect(() => {
+    if (isLoading) return
+    const assistantMsgs = messages.filter(m => m.role === 'assistant' && m.content?.trim())
+    const recent = assistantMsgs.slice(-3)
+    for (const m of recent) prefetchAudio(m, preferredLanguage)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, preferredLanguage, isLoading])
 
   // Unlock Web Audio / HTML5 Audio on iOS PWA on first user interaction
   useEffect(() => {
@@ -681,6 +693,37 @@ export default function ChatPage() {
     window.speechSynthesis.speak(utterance)
   }
 
+  // Fetch and cache TTS audio in the background so the first Listen click is instant.
+  const prefetchAudio = (message: Message, language: string): Promise<Blob | null> => {
+    const cacheKey = `${message.id}-${language}`
+    const existing = audioCacheRef.current.get(cacheKey)
+    if (existing) return Promise.resolve(existing)
+    const inflight = prefetchInflightRef.current.get(cacheKey)
+    if (inflight) return inflight
+    if (!message.content || !message.content.trim()) return Promise.resolve(null)
+    const p = (async () => {
+      try {
+        const response = await fetch(`${API_BASE}/api/speak/`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: message.content, language }),
+        })
+        if (!response.ok) return null
+        const blob = await response.blob()
+        if (blob.size === 0) return null
+        audioCacheRef.current.set(cacheKey, blob)
+        return blob
+      } catch {
+        return null
+      } finally {
+        prefetchInflightRef.current.delete(cacheKey)
+      }
+    })()
+    prefetchInflightRef.current.set(cacheKey, p)
+    return p
+  }
+
   const playMessage = async (message: Message) => {
     // Clicking the same message while loading → cancel the request
     if (isSpeaking === message.id && isTTSLoading) {
@@ -715,9 +758,14 @@ export default function ChatPage() {
       audioRef.current = null
     }
 
-    // Check in-memory cache first — replay is instant
+    // Check in-memory cache (or an in-flight prefetch) first — replay is instant.
     const cacheKey = `${message.id}-${preferredLanguage}`
-    const cachedBlob = audioCacheRef.current.get(cacheKey)
+    let cachedBlob = audioCacheRef.current.get(cacheKey)
+    const inflightPrefetch = prefetchInflightRef.current.get(cacheKey)
+    if (!cachedBlob && inflightPrefetch) {
+      setIsTTSLoading(true)
+      cachedBlob = (await inflightPrefetch) || undefined
+    }
     if (cachedBlob) {
       setIsTTSLoading(false)
       const objectUrl = URL.createObjectURL(cachedBlob)

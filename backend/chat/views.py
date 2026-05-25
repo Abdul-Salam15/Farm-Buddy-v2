@@ -672,9 +672,10 @@ def speak_text(request):
         clean_text = _re.sub(r'^\s*[-*]\s+', '', clean_text, flags=_re.MULTILINE)
         clean_text = _re.sub(r'^\s*\d+\.\s+', '', clean_text, flags=_re.MULTILINE)
         clean_text = _re.sub(r'\n{3,}', '\n\n', clean_text).strip()
-        # Cap at 300 chars so YarnGPT generates faster (shorter = lower latency)
-        if len(clean_text) > 300:
-            clean_text = clean_text[:300].rsplit(' ', 1)[0] + '...'
+        # Cap at 2000 chars as a safety bound; YarnGPT handles long text fine
+        # and audio is prefetched in the background, so latency is hidden.
+        if len(clean_text) > 2000:
+            clean_text = clean_text[:2000].rsplit(' ', 1)[0] + '...'
         
         # Use YarnGPT API for all languages
         from utils.openai_api import YARNGPT_API_KEY, YARNGPT_API_URL

@@ -124,6 +124,39 @@ function SidebarContent({
 }: SidebarProps) {
   const { t } = useTranslation()
   const { theme, setTheme } = useTheme()
+
+  const [msgResults, setMsgResults] = useState<Array<{
+    conversation_id: number
+    conversation_title: string
+    snippet: string
+  }>>([])
+  const [searching, setSearching] = useState(false)
+
+  useEffect(() => {
+    if (searchText.trim().length < 2) {
+      setMsgResults([])
+      setSearching(false)
+      return
+    }
+    setSearching(true)
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/chat/api/search/?q=${encodeURIComponent(searchText.trim())}`,
+          { credentials: 'include' }
+        )
+        const data = await res.json()
+        if (data.success) setMsgResults(data.results)
+        else setMsgResults([])
+      } catch {
+        setMsgResults([])
+      } finally {
+        setSearching(false)
+      }
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [searchText])
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-3 p-5">
@@ -170,17 +203,16 @@ function SidebarContent({
       </div>
 
       <div className="sidebar-scroll flex-1 overflow-y-auto overflow-x-hidden min-h-0 px-4">
-        <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
-          {t("chat.recent")}
-        </p>
-        <div className="space-y-1">
-          {(() => {
-            const displayedConversations = searchText.trim()
-              ? conversations.filter(c =>
-                  c.title.toLowerCase().includes(searchText.toLowerCase().trim())
-                )
-              : conversations
-            if (displayedConversations.length > 0) return displayedConversations.map((conv) => (
+        {!searchText.trim() && (
+          <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
+            {t("chat.recent")}
+          </p>
+        )}
+
+        {/* No search — show full list */}
+        {!searchText.trim() && (
+          <div className="space-y-1">
+            {conversations.length > 0 ? conversations.map((conv) => (
               <div key={conv.id} className="group relative">
                 {editingConvId === conv.id ? (
                   <form
@@ -193,76 +225,35 @@ function SidebarContent({
                       onChange={(e) => setEditingTitle(e.target.value)}
                       className="h-8 flex-1 rounded border border-input bg-white px-2 text-sm text-black focus-visible:ring-1 focus-visible:ring-primary"
                     />
-                    <Button
-                      type="submit"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0 text-green-500 hover:bg-green-500/10"
-                    >
+                    <Button type="submit" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-green-500 hover:bg-green-500/10">
                       <SaveIcon className="h-3.5 w-3.5" />
                     </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0 text-red-500 hover:bg-red-500/10"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setEditingConvId(null)
-                      }}
-                    >
+                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-red-500 hover:bg-red-500/10" onClick={(e) => { e.stopPropagation(); setEditingConvId(null) }}>
                       <X className="h-3.5 w-3.5" />
                     </Button>
                   </form>
                 ) : (
-                  <div className={cn(
-                    "flex w-full items-center rounded-lg text-sm transition-colors",
-                    currentConvId === conv.id
-                      ? "bg-sidebar-accent"
-                      : "hover:bg-sidebar-accent/50"
-                  )}>
-                    <button
-                      onClick={() => loadConversation(conv.id)}
-                      className={cn(
-                        "flex min-w-0 flex-1 flex-col gap-0.5 py-2 pl-3 text-left",
-                        currentConvId === conv.id
-                          ? "text-sidebar-foreground"
-                          : "text-sidebar-foreground/70"
-                      )}
-                    >
+                  <div className={cn("flex w-full items-center rounded-lg text-sm transition-colors", currentConvId === conv.id ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/50")}>
+                    <button onClick={() => loadConversation(conv.id)} className={cn("flex min-w-0 flex-1 flex-col gap-0.5 py-2 pl-3 text-left", currentConvId === conv.id ? "text-sidebar-foreground" : "text-sidebar-foreground/70")}>
                       <div className="flex min-w-0 items-center gap-2">
                         <MessageSquare className="h-4 w-4 shrink-0 opacity-60" />
                         <span className="truncate text-sm">{conv.title}</span>
                       </div>
                       <span className="pl-6 text-xs text-sidebar-foreground/50">{formatRelativeTime(conv.updated_at)}</span>
                     </button>
-
                     <div className="shrink-0 px-1">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button
-                            className="flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:bg-white/10 hover:text-zinc-200 transition-colors"
-                            onClick={(e) => e.stopPropagation()}
-                            title="More options"
-                          >
+                          <button className="flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:bg-white/10 hover:text-zinc-200 transition-colors" onClick={(e) => e.stopPropagation()} title="More options">
                             <MoreHorizontal className="h-4 w-4" />
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent side="right" align="start" className="w-40">
-                          <DropdownMenuItem
-                            className="gap-2 cursor-pointer"
-                            onSelect={() => {
-                              setEditingConvId(conv.id)
-                              setEditingTitle(conv.title)
-                            }}
-                          >
+                          <DropdownMenuItem className="gap-2 cursor-pointer" onSelect={() => { setEditingConvId(conv.id); setEditingTitle(conv.title) }}>
                             <Pencil className="h-3.5 w-3.5" />
                             Rename
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="gap-2 cursor-pointer text-red-500 focus:text-red-500"
-                            onSelect={(e) => handleDeleteConversation(e as any, conv.id)}
-                          >
+                          <DropdownMenuItem className="gap-2 cursor-pointer text-red-500 focus:text-red-500" onSelect={(e) => handleDeleteConversation(e as any, conv.id)}>
                             <Trash2 className="h-3.5 w-3.5" />
                             Delete
                           </DropdownMenuItem>
@@ -272,19 +263,69 @@ function SidebarContent({
                   </div>
                 )}
               </div>
-            ))
-            if (searchText.trim()) return (
-              <p className="py-8 text-center text-sm text-sidebar-foreground/40">
-                No conversations found
-              </p>
-            )
-            return (
-              <p className="py-8 text-center text-sm text-sidebar-foreground/40">
-                {t("chat.no_conversations")}
-              </p>
-            )
-          })()}
-        </div>
+            )) : (
+              <p className="py-8 text-center text-sm text-sidebar-foreground/40">{t("chat.no_conversations")}</p>
+            )}
+          </div>
+        )}
+
+        {/* Search active — show title matches + message matches */}
+        {searchText.trim() && (() => {
+          const titleMatches = conversations.filter(c =>
+            c.title.toLowerCase().includes(searchText.toLowerCase().trim())
+          )
+          const titleMatchIds = new Set(titleMatches.map(c => c.id))
+          const messageMatches = msgResults.filter(r => !titleMatchIds.has(r.conversation_id))
+          const hasAny = titleMatches.length > 0 || messageMatches.length > 0
+
+          return (
+            <div className="space-y-3">
+              {/* Title matches */}
+              {titleMatches.length > 0 && (
+                <div>
+                  <p className="mb-1 px-1 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">Chats</p>
+                  <div className="space-y-1">
+                    {titleMatches.map(conv => (
+                      <button key={conv.id} onClick={() => loadConversation(conv.id)} className={cn("flex w-full min-w-0 flex-col gap-0.5 rounded-lg py-2 pl-3 pr-2 text-left text-sm transition-colors", currentConvId === conv.id ? "bg-sidebar-accent text-sidebar-foreground" : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50")}>
+                        <div className="flex min-w-0 items-center gap-2">
+                          <MessageSquare className="h-4 w-4 shrink-0 opacity-60" />
+                          <span className="truncate text-sm">{conv.title}</span>
+                        </div>
+                        <span className="pl-6 text-xs text-sidebar-foreground/50">{formatRelativeTime(conv.updated_at)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Message matches */}
+              {(messageMatches.length > 0 || searching) && (
+                <div>
+                  <p className="mb-1 px-1 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">Messages</p>
+                  {searching && messageMatches.length === 0 ? (
+                    <p className="px-1 text-xs text-sidebar-foreground/40">Searching…</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {messageMatches.map(r => (
+                        <button key={r.conversation_id} onClick={() => loadConversation(r.conversation_id)} className={cn("flex w-full min-w-0 flex-col gap-1 rounded-lg py-2 pl-3 pr-2 text-left text-sm transition-colors", currentConvId === r.conversation_id ? "bg-sidebar-accent text-sidebar-foreground" : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50")}>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <MessageSquare className="h-4 w-4 shrink-0 opacity-60" />
+                            <span className="truncate text-sm">{r.conversation_title}</span>
+                          </div>
+                          <p className="pl-6 text-xs text-sidebar-foreground/50 line-clamp-2 whitespace-normal">{r.snippet}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!hasAny && !searching && (
+                <p className="py-8 text-center text-sm text-sidebar-foreground/40">No results found</p>
+              )}
+            </div>
+          )
+        })()}
 
       </div>
 

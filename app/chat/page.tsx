@@ -104,8 +104,6 @@ interface SidebarProps {
   currentConvId: number | null
   searchText: string
   setSearchText: (v: string) => void
-  activeSearch: string
-  setActiveSearch: (v: string) => void
   editingConvId: number | null
   setEditingConvId: (id: number | null) => void
   editingTitle: string
@@ -120,7 +118,7 @@ interface SidebarProps {
 
 function SidebarContent({
   conversations, currentConvId, searchText, setSearchText,
-  activeSearch, setActiveSearch, editingConvId, setEditingConvId,
+  editingConvId, setEditingConvId,
   editingTitle, setEditingTitle, handleNewChat, handleRename,
   handleDeleteConversation, loadConversation, handleLogout, setSidebarOpen,
 }: SidebarProps) {
@@ -147,10 +145,7 @@ function SidebarContent({
 
       {/* Search */}
       <div className="px-4 pb-3">
-        <form onSubmit={(e) => {
-          e.preventDefault()
-          setActiveSearch(searchText.trim())
-        }}>
+        <form onSubmit={(e) => e.preventDefault()}>
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-sidebar-foreground/40 pointer-events-none" />
             <input
@@ -161,10 +156,10 @@ function SidebarContent({
               placeholder="Search conversations..."
               className="w-full rounded-lg border border-sidebar-border bg-sidebar-accent/40 py-2 pl-8 pr-3 text-sm text-sidebar-foreground placeholder:text-sidebar-foreground/40 outline-none focus:border-primary/50 focus:bg-sidebar-accent/60 transition-colors"
             />
-            {(searchText || activeSearch) && (
+            {searchText && (
               <button
                 type="button"
-                onClick={() => { setSearchText(""); setActiveSearch("") }}
+                onClick={() => setSearchText("")}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sidebar-foreground/40 hover:text-sidebar-foreground"
               >
                 <X className="h-3.5 w-3.5" />
@@ -180,9 +175,9 @@ function SidebarContent({
         </p>
         <div className="space-y-1">
           {(() => {
-            const displayedConversations = activeSearch
+            const displayedConversations = searchText.trim()
               ? conversations.filter(c =>
-                  c.title.toLowerCase().includes(activeSearch.toLowerCase())
+                  c.title.toLowerCase().includes(searchText.toLowerCase().trim())
                 )
               : conversations
             if (displayedConversations.length > 0) return displayedConversations.map((conv) => (
@@ -278,7 +273,7 @@ function SidebarContent({
                 )}
               </div>
             ))
-            if (activeSearch) return (
+            if (searchText.trim()) return (
               <p className="py-8 text-center text-sm text-sidebar-foreground/40">
                 No conversations found
               </p>
@@ -355,7 +350,6 @@ export default function ChatPage() {
   const [editingConvId, setEditingConvId] = useState<number | null>(null)
   const [editingTitle, setEditingTitle] = useState("")
   const [searchText, setSearchText] = useState("")
-  const [activeSearch, setActiveSearch] = useState("")
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recognitionRef = useRef<any>(null)
@@ -1115,8 +1109,7 @@ export default function ChatPage() {
           currentConvId={currentConvId}
           searchText={searchText}
           setSearchText={setSearchText}
-          activeSearch={activeSearch}
-          setActiveSearch={setActiveSearch}
+
           editingConvId={editingConvId}
           setEditingConvId={setEditingConvId}
           editingTitle={editingTitle}
@@ -1142,8 +1135,6 @@ export default function ChatPage() {
             currentConvId={currentConvId}
             searchText={searchText}
             setSearchText={setSearchText}
-            activeSearch={activeSearch}
-            setActiveSearch={setActiveSearch}
             editingConvId={editingConvId}
             setEditingConvId={setEditingConvId}
             editingTitle={editingTitle}

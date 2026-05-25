@@ -403,6 +403,7 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const speechResultRef = useRef('')
   const audioContextRef = useRef<AudioContext | null>(null)
+  const audioCacheRef = useRef<Map<string, Blob>>(new Map())
   const isAutoScrollingRef = useRef(true)
   const hasRestoredConvRef = useRef(false)
   const scrollToMessageRef = useRef<string | number | null>(null)
@@ -706,17 +707,30 @@ export default function ChatPage() {
     ttsAbortRef.current?.abort()
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
 
-    const abort = new AbortController()
-    ttsAbortRef.current = abort
-
     setIsSpeaking(message.id)
     setIsPaused(false)
-    setIsTTSLoading(true)
 
     const resetState = () => {
       setIsSpeaking(null); setIsPaused(false); setIsTTSLoading(false)
       audioRef.current = null
     }
+
+    // Check in-memory cache first — replay is instant
+    const cacheKey = `${message.id}-${preferredLanguage}`
+    const cachedBlob = audioCacheRef.current.get(cacheKey)
+    if (cachedBlob) {
+      setIsTTSLoading(false)
+      const objectUrl = URL.createObjectURL(cachedBlob)
+      const audio = new Audio(objectUrl)
+      audioRef.current = audio
+      audio.onended = () => { resetState(); URL.revokeObjectURL(objectUrl) }
+      await audio.play().catch(() => { URL.revokeObjectURL(objectUrl); speakWithBrowser(message.content) })
+      return
+    }
+
+    const abort = new AbortController()
+    ttsAbortRef.current = abort
+    setIsTTSLoading(true)
 
     try {
       const response = await fetch(
@@ -748,6 +762,7 @@ export default function ChatPage() {
           catch {
             URL.revokeObjectURL(msUrl); audioRef.current = null
             const blob = await new Response(response.body).blob()
+            audioCacheRef.current.set(cacheKey, blob)
             const blobUrl = URL.createObjectURL(blob)
             const a = new Audio(blobUrl)
             audioRef.current = a
@@ -757,11 +772,20 @@ export default function ChatPage() {
             return
           }
 
+          const chunks: Uint8Array[] = []
           const reader = response.body!.getReader()
           const pump = async (): Promise<void> => {
             if (abort.signal.aborted) { reader.cancel(); return }
             const { done, value } = await reader.read()
-            if (done) { if (ms.readyState === 'open') { try { ms.endOfStream() } catch {} } return }
+            if (done) {
+              if (!abort.signal.aborted) {
+                const blob = new Blob(chunks, { type: contentType })
+                audioCacheRef.current.set(cacheKey, blob)
+              }
+              if (ms.readyState === 'open') { try { ms.endOfStream() } catch {} }
+              return
+            }
+            chunks.push(value)
             await new Promise<void>(r => { sb.addEventListener('updateend', () => r(), { once: true }); sb.appendBuffer(value) })
             return pump()
           }
@@ -782,6 +806,7 @@ export default function ChatPage() {
         // Fallback: buffer full response then play (older browsers)
         const blob = await response.blob()
         if (abort.signal.aborted) return
+        audioCacheRef.current.set(cacheKey, blob)
         const objectUrl = URL.createObjectURL(blob)
         const audio = new Audio(objectUrl)
         audioRef.current = audio

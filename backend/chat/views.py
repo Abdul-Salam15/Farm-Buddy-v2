@@ -679,7 +679,6 @@ def speak_text(request):
         # Use YarnGPT API for all languages
         from utils.openai_api import YARNGPT_API_KEY, YARNGPT_API_URL
         import requests
-        from django.http import StreamingHttpResponse
         
         headers = {
             "Authorization": f"Bearer {YARNGPT_API_KEY}",
@@ -700,22 +699,29 @@ def speak_text(request):
             "text": clean_text,
             "voice": voice
         }
-            
+
+        import hashlib
+        from django.core.cache import cache
+        from django.http import HttpResponse
+        cache_key = f"tts_{hashlib.md5(f'{clean_text}:{voice}'.encode()).hexdigest()}"
+        cached_audio = cache.get(cache_key)
+        if cached_audio:
+            response = HttpResponse(cached_audio, content_type='audio/mpeg')
+            response['Cache-Control'] = 'private, max-age=86400'
+            return response
+
         # 5s connect timeout, 20s read timeout — prevents indefinite hangs
         api_response = requests.post(
             YARNGPT_API_URL, headers=headers, json=payload,
-            stream=True, timeout=(5, 20)
+            timeout=(5, 20)
         )
 
         if api_response.status_code == 200:
             content_type = api_response.headers.get('Content-Type', 'audio/mpeg')
-
-            # Pipe the response chunks directly to the browser
-            response = StreamingHttpResponse(
-                api_response.iter_content(chunk_size=4096),
-                content_type=content_type
-            )
-            response['Cache-Control'] = 'no-cache'
+            audio_bytes = api_response.content
+            cache.set(cache_key, audio_bytes, timeout=86400)
+            response = HttpResponse(audio_bytes, content_type=content_type)
+            response['Cache-Control'] = 'private, max-age=86400'
             return response
         else:
             error_text = api_response.text

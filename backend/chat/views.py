@@ -312,6 +312,7 @@ def api_search_messages(request):
                 'conversation_title': msg.conversation.title,
                 'snippet': snippet,
                 'updated_at': msg.conversation.updated_at.isoformat(),
+                'message_id': msg.id,
             })
             if len(results) >= 20:
                 break

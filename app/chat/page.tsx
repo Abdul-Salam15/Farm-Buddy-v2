@@ -111,7 +111,7 @@ interface SidebarProps {
   handleNewChat: () => void
   handleRename: (e: React.FormEvent) => void
   handleDeleteConversation: (e: any, id: number) => void
-  loadConversation: (id: number) => void
+  loadConversation: (id: number, messageId?: string | number) => void
   handleLogout: () => void
   setSidebarOpen: (open: boolean) => void
 }
@@ -129,6 +129,7 @@ function SidebarContent({
     conversation_id: number
     conversation_title: string
     snippet: string
+    message_id: number
   }>>([])
   const [searching, setSearching] = useState(false)
 
@@ -307,7 +308,7 @@ function SidebarContent({
                   ) : (
                     <div className="space-y-1">
                       {messageMatches.map(r => (
-                        <button key={r.conversation_id} onClick={() => loadConversation(r.conversation_id)} className={cn("flex w-full min-w-0 flex-col gap-1 rounded-lg py-2 pl-3 pr-2 text-left text-sm transition-colors", currentConvId === r.conversation_id ? "bg-sidebar-accent text-sidebar-foreground" : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50")}>
+                        <button key={r.conversation_id} onClick={() => loadConversation(r.conversation_id, r.message_id)} className={cn("flex w-full min-w-0 flex-col gap-1 rounded-lg py-2 pl-3 pr-2 text-left text-sm transition-colors", currentConvId === r.conversation_id ? "bg-sidebar-accent text-sidebar-foreground" : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50")}>
                           <div className="flex min-w-0 items-center gap-2">
                             <MessageSquare className="h-4 w-4 shrink-0 opacity-60" />
                             <span className="truncate text-sm">{r.conversation_title}</span>
@@ -404,6 +405,7 @@ export default function ChatPage() {
   const audioContextRef = useRef<AudioContext | null>(null)
   const isAutoScrollingRef = useRef(true)
   const hasRestoredConvRef = useRef(false)
+  const scrollToMessageRef = useRef<string | number | null>(null)
 
   const quickActions = [
     { icon: Leaf, label: t("chat.quick_actions.crop_disease") },
@@ -438,7 +440,16 @@ export default function ChatPage() {
   }, [])
 
   useEffect(() => {
-    scrollToBottom()
+    if (scrollToMessageRef.current != null) {
+      const targetId = scrollToMessageRef.current
+      scrollToMessageRef.current = null
+      setTimeout(() => {
+        document.getElementById(`msg-${targetId}`)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 50)
+    } else {
+      scrollToBottom()
+    }
   }, [messages, scrollToBottom])
 
   // Unlock Web Audio / HTML5 Audio on iOS PWA on first user interaction
@@ -853,7 +864,8 @@ export default function ChatPage() {
     }
   }, [])
 
-  const loadConversation = async (id: number) => {
+  const loadConversation = async (id: number, messageId?: string | number) => {
+    if (messageId !== undefined) scrollToMessageRef.current = messageId
     try {
       setIsLoading(true)
       setMessages([]) // Clear current messages for immediate feedback
@@ -1260,6 +1272,7 @@ export default function ChatPage() {
                   {messages.map((message, idx) => (
                     <div
                       key={message.id || idx}
+                      id={message.id != null ? `msg-${message.id}` : undefined}
                       className={cn(
                         "flex w-full min-w-0 mb-6",
                         message.role === "user" ? "justify-end" : "justify-start"

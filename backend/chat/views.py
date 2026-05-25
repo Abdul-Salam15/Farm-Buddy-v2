@@ -711,26 +711,37 @@ def speak_text(request):
             response['Cache-Control'] = 'private, max-age=86400'
             return response
 
-        # 5s connect timeout, 45s read timeout — gives YarnGPT more time before fallback
-        api_response = requests.post(
-            YARNGPT_API_URL, headers=headers, json=payload,
-            timeout=(5, 45)
-        )
+        # Try YarnGPT first (Nigerian voices). 15s read timeout — if it hasn't
+        # responded by then it is overloaded; fall through to OpenAI TTS.
+        audio_bytes = None
+        content_type = 'audio/mpeg'
+        try:
+            api_response = requests.post(
+                YARNGPT_API_URL, headers=headers, json=payload,
+                timeout=(5, 15)
+            )
+            if api_response.status_code == 200:
+                content_type = api_response.headers.get('Content-Type', 'audio/mpeg')
+                audio_bytes = api_response.content
+            else:
+                print(f"YarnGPT API Error ({api_response.status_code}): {api_response.text[:200]}")
+        except Exception as yarn_err:
+            print(f"YarnGPT failed ({yarn_err}), falling back to OpenAI TTS")
 
-        if api_response.status_code == 200:
-            content_type = api_response.headers.get('Content-Type', 'audio/mpeg')
-            audio_bytes = api_response.content
-            cache.set(cache_key, audio_bytes, timeout=86400)
-            response = HttpResponse(audio_bytes, content_type=content_type)
-            response['Cache-Control'] = 'private, max-age=86400'
-            return response
-        else:
-            error_text = api_response.text
-            print(f"YarnGPT API Error ({api_response.status_code}): {error_text[:200]}")
-            return JsonResponse({'success': False, 'error': f"YarnGPT API Error: {error_text}"}, status=500)
-        
-    except requests.exceptions.Timeout:
-        return JsonResponse({'success': False, 'error': 'TTS service timed out. Please try again.'}, status=504)
+        if audio_bytes is None:
+            from utils.openai_api import client as openai_client
+            oai_resp = openai_client.audio.speech.create(
+                model="tts-1",
+                voice="shimmer",
+                input=clean_text,
+            )
+            audio_bytes = oai_resp.content
+
+        cache.set(cache_key, audio_bytes, timeout=86400)
+        response = HttpResponse(audio_bytes, content_type=content_type)
+        response['Cache-Control'] = 'private, max-age=86400'
+        return response
+
     except Exception as e:
         print(f"TTS Error: {e}")
         return JsonResponse({'success': False, 'error': str(e)}, status=500)

@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { LanguageProvider } from '@/app/i18n/LanguageContext'
+import { Toaster } from '@/components/ui/toaster'
 import './globals.css'
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
@@ -40,6 +41,7 @@ export default function RootLayout({
         >
           <LanguageProvider>
             {children}
+            <Toaster />
           </LanguageProvider>
         </ThemeProvider>
         <Analytics />

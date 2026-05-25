@@ -1011,6 +1011,8 @@ export default function ChatPage() {
   const handleSend = async (overrideText?: string) => {
     const textToSend = overrideText !== undefined ? overrideText : inputValue
     if ((!textToSend.trim() && !selectedImage) || isLoading) return
+    // Prevent sending while a new conversation is still being created on the server (tempId < 0)
+    if (currentConvId !== null && currentConvId < 0) return
 
     const tempUserMsg: Message = {
       id: Date.now(),
@@ -1125,17 +1127,38 @@ export default function ChatPage() {
   }
 
   const handleNewChat = async () => {
+    // Optimistic update: switch to the new chat instantly without waiting for the server
+    const tempId = -Date.now()
+    const newTitle = t("chat.new_chat") || "New Chat"
+    const optimisticConv: ConversationItem = { id: tempId, title: newTitle, updated_at: new Date().toISOString() }
+
+    setMessages([])
+    setConversations(prev => [optimisticConv, ...prev])
+    setCurrentConvId(tempId)
+    setSidebarOpen(false)
+
     try {
       const res = await fetch(`${API_BASE}/new/`, { method: "POST", credentials: "include" })
       const data = await res.json()
       if (data.success) {
-        setMessages([])
+        // Replace the temp entry with the real conversation from the server response
+        const realConv: ConversationItem = {
+          id: data.conversation_id,
+          title: data.title || newTitle,
+          updated_at: new Date().toISOString(),
+        }
+        setConversations(prev => prev.map(c => (c.id === tempId ? realConv : c)))
         setCurrentConvId(data.conversation_id)
-        fetchConversations()
-        setSidebarOpen(false)
+      } else {
+        // Rollback on server-side failure
+        setConversations(prev => prev.filter(c => c.id !== tempId))
+        setCurrentConvId(null)
       }
     } catch (err) {
       console.error("Failed to create new chat", err)
+      // Rollback on network failure
+      setConversations(prev => prev.filter(c => c.id !== tempId))
+      setCurrentConvId(null)
     }
   }
 

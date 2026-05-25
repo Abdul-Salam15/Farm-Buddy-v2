@@ -99,6 +99,240 @@ function FormattedMessage({ content }: { content: string }) {
   );
 }
 
+interface SidebarProps {
+  conversations: ConversationItem[]
+  currentConvId: number | null
+  searchText: string
+  setSearchText: (v: string) => void
+  activeSearch: string
+  setActiveSearch: (v: string) => void
+  editingConvId: number | null
+  setEditingConvId: (id: number | null) => void
+  editingTitle: string
+  setEditingTitle: (title: string) => void
+  handleNewChat: () => void
+  handleRename: (e: React.FormEvent) => void
+  handleDeleteConversation: (e: any, id: number) => void
+  loadConversation: (id: number) => void
+  handleLogout: () => void
+  setSidebarOpen: (open: boolean) => void
+}
+
+function SidebarContent({
+  conversations, currentConvId, searchText, setSearchText,
+  activeSearch, setActiveSearch, editingConvId, setEditingConvId,
+  editingTitle, setEditingTitle, handleNewChat, handleRename,
+  handleDeleteConversation, loadConversation, handleLogout, setSidebarOpen,
+}: SidebarProps) {
+  const { t } = useTranslation()
+  const { theme, setTheme } = useTheme()
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex items-center gap-3 p-5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary">
+          <Sprout className="h-5 w-5 text-sidebar-primary-foreground" />
+        </div>
+        <span className="text-lg font-semibold text-sidebar-foreground">FarmBuddy</span>
+      </div>
+
+      <div className="px-4 pb-3">
+        <Button
+          className="w-full justify-start gap-2"
+          onClick={handleNewChat}
+        >
+          <Plus className="h-4 w-4" />
+          {t("chat.new_chat")}
+        </Button>
+      </div>
+
+      {/* Search */}
+      <div className="px-4 pb-3">
+        <form onSubmit={(e) => {
+          e.preventDefault()
+          setActiveSearch(searchText.trim())
+        }}>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-sidebar-foreground/40 pointer-events-none" />
+            <input
+              type="text"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              enterKeyHint="search"
+              placeholder="Search conversations..."
+              className="w-full rounded-lg border border-sidebar-border bg-sidebar-accent/40 py-2 pl-8 pr-3 text-sm text-sidebar-foreground placeholder:text-sidebar-foreground/40 outline-none focus:border-primary/50 focus:bg-sidebar-accent/60 transition-colors"
+            />
+            {(searchText || activeSearch) && (
+              <button
+                type="button"
+                onClick={() => { setSearchText(""); setActiveSearch("") }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sidebar-foreground/40 hover:text-sidebar-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
+
+      <div className="sidebar-scroll flex-1 overflow-y-auto overflow-x-hidden min-h-0 px-4">
+        <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
+          {t("chat.recent")}
+        </p>
+        <div className="space-y-1">
+          {(() => {
+            const displayedConversations = activeSearch
+              ? conversations.filter(c =>
+                  c.title.toLowerCase().includes(activeSearch.toLowerCase())
+                )
+              : conversations
+            if (displayedConversations.length > 0) return displayedConversations.map((conv) => (
+              <div key={conv.id} className="group relative">
+                {editingConvId === conv.id ? (
+                  <form
+                    onSubmit={handleRename}
+                    className="flex w-full items-center gap-1 rounded-lg bg-sidebar-accent px-2 py-1"
+                  >
+                    <Input
+                      autoFocus
+                      value={editingTitle}
+                      onChange={(e) => setEditingTitle(e.target.value)}
+                      className="h-8 flex-1 rounded border border-input bg-white px-2 text-sm text-black focus-visible:ring-1 focus-visible:ring-primary"
+                    />
+                    <Button
+                      type="submit"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0 text-green-500 hover:bg-green-500/10"
+                    >
+                      <SaveIcon className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0 text-red-500 hover:bg-red-500/10"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setEditingConvId(null)
+                      }}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </form>
+                ) : (
+                  <div className={cn(
+                    "flex w-full items-center rounded-lg text-sm transition-colors",
+                    currentConvId === conv.id
+                      ? "bg-sidebar-accent"
+                      : "hover:bg-sidebar-accent/50"
+                  )}>
+                    <button
+                      onClick={() => loadConversation(conv.id)}
+                      className={cn(
+                        "flex min-w-0 flex-1 flex-col gap-0.5 py-2 pl-3 text-left",
+                        currentConvId === conv.id
+                          ? "text-sidebar-foreground"
+                          : "text-sidebar-foreground/70"
+                      )}
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <MessageSquare className="h-4 w-4 shrink-0 opacity-60" />
+                        <span className="truncate text-sm">{conv.title}</span>
+                      </div>
+                      <span className="pl-6 text-xs text-sidebar-foreground/50">{formatRelativeTime(conv.updated_at)}</span>
+                    </button>
+
+                    <div className="shrink-0 px-1">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            className="flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:bg-white/10 hover:text-zinc-200 transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                            title="More options"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent side="right" align="start" className="w-40">
+                          <DropdownMenuItem
+                            className="gap-2 cursor-pointer"
+                            onSelect={() => {
+                              setEditingConvId(conv.id)
+                              setEditingTitle(conv.title)
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Rename
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="gap-2 cursor-pointer text-red-500 focus:text-red-500"
+                            onSelect={(e) => handleDeleteConversation(e as any, conv.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))
+            if (activeSearch) return (
+              <p className="py-8 text-center text-sm text-sidebar-foreground/40">
+                No conversations found
+              </p>
+            )
+            return (
+              <p className="py-8 text-center text-sm text-sidebar-foreground/40">
+                {t("chat.no_conversations")}
+              </p>
+            )
+          })()}
+        </div>
+
+      </div>
+
+      <div className="border-t border-sidebar-border p-4">
+        <div className="space-y-1">
+          <Link
+            href="/profile"
+            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
+          >
+            <User className="h-4 w-4 opacity-70" />
+            {t("chat.my_farm")}
+          </Link>
+          <Link
+            href="/settings"
+            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
+          >
+            <Settings className="h-4 w-4 opacity-70" />
+            {t("chat.settings")}
+          </Link>
+          <button
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
+          >
+            {theme === "dark" ? (
+              <Sun className="h-4 w-4 opacity-70" />
+            ) : (
+              <Moon className="h-4 w-4 opacity-70" />
+            )}
+            {theme === "dark" ? t("chat.light_mode") : t("chat.dark_mode")}
+          </button>
+          <button
+            onClick={handleLogout}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-red-400 transition-colors hover:bg-sidebar-accent"
+          >
+            <LogOut className="h-4 w-4 opacity-70" />
+            {t("chat.logout")}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function ChatPage() {
   const { t } = useTranslation()
   const [messages, setMessages] = useState<Message[]>([])
@@ -872,217 +1106,28 @@ export default function ChatPage() {
     }
   }
 
-  const SidebarContent = () => (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center gap-3 p-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary">
-          <Sprout className="h-5 w-5 text-sidebar-primary-foreground" />
-        </div>
-        <span className="text-lg font-semibold text-sidebar-foreground">FarmBuddy</span>
-      </div>
-
-      <div className="px-4 pb-3">
-        <Button
-          className="w-full justify-start gap-2"
-          onClick={handleNewChat}
-        >
-          <Plus className="h-4 w-4" />
-          {t("chat.new_chat")}
-        </Button>
-      </div>
-
-      {/* Search */}
-      <div className="px-4 pb-3">
-        <form onSubmit={(e) => {
-          e.preventDefault()
-          setActiveSearch(searchText.trim())
-        }}>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-sidebar-foreground/40 pointer-events-none" />
-            <input
-              type="text"
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              enterKeyHint="search"
-              placeholder="Search conversations..."
-              className="w-full rounded-lg border border-sidebar-border bg-sidebar-accent/40 py-2 pl-8 pr-3 text-sm text-sidebar-foreground placeholder:text-sidebar-foreground/40 outline-none focus:border-primary/50 focus:bg-sidebar-accent/60 transition-colors"
-            />
-            {(searchText || activeSearch) && (
-              <button
-                type="button"
-                onClick={() => { setSearchText(""); setActiveSearch("") }}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sidebar-foreground/40 hover:text-sidebar-foreground"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        </form>
-      </div>
-
-      <div className="sidebar-scroll flex-1 overflow-y-auto overflow-x-hidden min-h-0 px-4">
-        <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
-          {t("chat.recent")}
-        </p>
-        <div className="space-y-1">
-          {(() => {
-            const displayedConversations = activeSearch
-              ? conversations.filter(c =>
-                  c.title.toLowerCase().includes(activeSearch.toLowerCase())
-                )
-              : conversations
-            if (displayedConversations.length > 0) return displayedConversations.map((conv) => (
-              <div key={conv.id} className="group relative">
-                {editingConvId === conv.id ? (
-                  <form
-                    onSubmit={handleRename}
-                    className="flex w-full items-center gap-1 rounded-lg bg-sidebar-accent px-2 py-1"
-                  >
-                    <Input
-                      autoFocus
-                      value={editingTitle}
-                      onChange={(e) => setEditingTitle(e.target.value)}
-                      className="h-8 flex-1 rounded border border-input bg-white px-2 text-sm text-black focus-visible:ring-1 focus-visible:ring-primary"
-                    />
-                    <Button
-                      type="submit"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0 text-green-500 hover:bg-green-500/10"
-                    >
-                      <SaveIcon className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0 text-red-500 hover:bg-red-500/10"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setEditingConvId(null)
-                      }}
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
-                  </form>
-                ) : (
-                  <div className={cn(
-                    "flex w-full items-center rounded-lg text-sm transition-colors",
-                    currentConvId === conv.id
-                      ? "bg-sidebar-accent"
-                      : "hover:bg-sidebar-accent/50"
-                  )}>
-                    <button
-                      onClick={() => loadConversation(conv.id)}
-                      className={cn(
-                        "flex min-w-0 flex-1 flex-col gap-0.5 py-2 pl-3 text-left",
-                        currentConvId === conv.id
-                          ? "text-sidebar-foreground"
-                          : "text-sidebar-foreground/70"
-                      )}
-                    >
-                      <div className="flex min-w-0 items-center gap-2">
-                        <MessageSquare className="h-4 w-4 shrink-0 opacity-60" />
-                        <span className="truncate text-sm">{conv.title}</span>
-                      </div>
-                      <span className="pl-6 text-xs text-sidebar-foreground/50">{formatRelativeTime(conv.updated_at)}</span>
-                    </button>
-
-                    <div className="shrink-0 px-1">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button
-                            className="flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:bg-white/10 hover:text-zinc-200 transition-colors"
-                            onClick={(e) => e.stopPropagation()}
-                            title="More options"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent side="right" align="start" className="w-40">
-                          <DropdownMenuItem
-                            className="gap-2 cursor-pointer"
-                            onSelect={() => {
-                              setEditingConvId(conv.id)
-                              setEditingTitle(conv.title)
-                            }}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                            Rename
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="gap-2 cursor-pointer text-red-500 focus:text-red-500"
-                            onSelect={(e) => handleDeleteConversation(e as any, conv.id)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))
-            if (activeSearch) return (
-              <p className="py-8 text-center text-sm text-sidebar-foreground/40">
-                No conversations found
-              </p>
-            )
-            return (
-              <p className="py-8 text-center text-sm text-sidebar-foreground/40">
-                {t("chat.no_conversations")}
-              </p>
-            )
-          })()}
-        </div>
-
-      </div>
-
-      <div className="border-t border-sidebar-border p-4">
-        <div className="space-y-1">
-          <Link
-            href="/profile"
-            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
-          >
-            <User className="h-4 w-4 opacity-70" />
-            {t("chat.my_farm")}
-          </Link>
-          <Link
-            href="/settings"
-            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
-          >
-            <Settings className="h-4 w-4 opacity-70" />
-            {t("chat.settings")}
-          </Link>
-          <button
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
-          >
-            {theme === "dark" ? (
-              <Sun className="h-4 w-4 opacity-70" />
-            ) : (
-              <Moon className="h-4 w-4 opacity-70" />
-            )}
-            {theme === "dark" ? t("chat.light_mode") : t("chat.dark_mode")}
-          </button>
-          <button
-            onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-red-400 transition-colors hover:bg-sidebar-accent"
-          >
-            <LogOut className="h-4 w-4 opacity-70" />
-            {t("chat.logout")}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-
   return (
     <div className="flex h-[100dvh] bg-background overflow-hidden">
       {/* Desktop Sidebar */}
       <aside className="hidden w-64 shrink-0 bg-sidebar lg:block">
-        <SidebarContent />
+        <SidebarContent
+          conversations={conversations}
+          currentConvId={currentConvId}
+          searchText={searchText}
+          setSearchText={setSearchText}
+          activeSearch={activeSearch}
+          setActiveSearch={setActiveSearch}
+          editingConvId={editingConvId}
+          setEditingConvId={setEditingConvId}
+          editingTitle={editingTitle}
+          setEditingTitle={setEditingTitle}
+          handleNewChat={handleNewChat}
+          handleRename={handleRename}
+          handleDeleteConversation={handleDeleteConversation}
+          loadConversation={loadConversation}
+          handleLogout={handleLogout}
+          setSidebarOpen={setSidebarOpen}
+        />
       </aside>
 
       {/* Mobile Sidebar */}
@@ -1092,7 +1137,24 @@ export default function ChatPage() {
           <SheetDescription className="sr-only">
             Access your chats, farm profile, and settings
           </SheetDescription>
-          <SidebarContent />
+          <SidebarContent
+            conversations={conversations}
+            currentConvId={currentConvId}
+            searchText={searchText}
+            setSearchText={setSearchText}
+            activeSearch={activeSearch}
+            setActiveSearch={setActiveSearch}
+            editingConvId={editingConvId}
+            setEditingConvId={setEditingConvId}
+            editingTitle={editingTitle}
+            setEditingTitle={setEditingTitle}
+            handleNewChat={handleNewChat}
+            handleRename={handleRename}
+            handleDeleteConversation={handleDeleteConversation}
+            loadConversation={loadConversation}
+            handleLogout={handleLogout}
+            setSidebarOpen={setSidebarOpen}
+          />
         </SheetContent>
       </Sheet>
 

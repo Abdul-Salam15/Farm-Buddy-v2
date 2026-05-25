@@ -441,6 +441,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (scrollToMessageRef.current != null) {
+      if (messages.length === 0) return  // wait for actual messages to load
       const targetId = scrollToMessageRef.current
       scrollToMessageRef.current = null
       setTimeout(() => {

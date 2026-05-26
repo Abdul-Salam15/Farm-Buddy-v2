@@ -16,3 +16,4 @@ dj-database-url
 django-jazzmin
 cloudinary
 django-cloudinary-storage
+gtts

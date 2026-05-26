@@ -726,16 +726,16 @@ def speak_text(request):
             else:
                 print(f"YarnGPT API Error ({api_response.status_code}): {api_response.text[:200]}")
         except Exception as yarn_err:
-            print(f"YarnGPT failed ({yarn_err}), falling back to OpenAI TTS")
+            print(f"YarnGPT failed ({yarn_err}), falling back to gTTS")
 
         if audio_bytes is None:
-            from utils.openai_api import client as openai_client
-            oai_resp = openai_client.audio.speech.create(
-                model="tts-1",
-                voice="shimmer",
-                input=clean_text,
-            )
-            audio_bytes = oai_resp.content
+            from gtts import gTTS
+            import io as _io
+            gtts_lang = {'en': 'en', 'ha': 'ha', 'ig': 'ig', 'yo': 'yo'}.get(language, 'en')
+            buf = _io.BytesIO()
+            gTTS(text=clean_text, lang=gtts_lang).write_to_fp(buf)
+            audio_bytes = buf.getvalue()
+            content_type = 'audio/mpeg'
 
         cache.set(cache_key, audio_bytes, timeout=86400)
         response = HttpResponse(audio_bytes, content_type=content_type)

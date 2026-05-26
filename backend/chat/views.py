@@ -733,7 +733,8 @@ def speak_text(request):
             import io as _io
             gtts_lang = {'en': 'en', 'ha': 'ha', 'ig': 'ig', 'yo': 'yo'}.get(language, 'en')
             buf = _io.BytesIO()
-            gTTS(text=clean_text, lang=gtts_lang).write_to_fp(buf)
+            tld = 'com.ng' if gtts_lang == 'en' else 'com'
+            gTTS(text=clean_text, lang=gtts_lang, tld=tld).write_to_fp(buf)
             audio_bytes = buf.getvalue()
             content_type = 'audio/mpeg'
 

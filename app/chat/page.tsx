@@ -683,7 +683,7 @@ export default function ChatPage() {
   const speakWithBrowser = (text: string) => {
     toast({
       title: "Voice service unavailable",
-      description: "FarmBuddy's voice is temporarily unavailable. Using your device's default voice instead.",
+      description: "FarmBuddy's voice is temporarily unavailable. Using your browser's voice instead.",
       variant: "destructive",
       duration: 5000,
     })
@@ -693,8 +693,8 @@ export default function ChatPage() {
     }
     window.speechSynthesis.cancel()
     const utterance = new SpeechSynthesisUtterance(text)
-    const langMap: Record<string, string> = { en: 'en-US', ha: 'ha', ig: 'ig', yo: 'yo' }
-    utterance.lang = langMap[preferredLanguage] || 'en-US'
+    const langMap: Record<string, string> = { en: 'en-NG', ha: 'ha-NG', ig: 'ig-NG', yo: 'yo-NG' }
+    utterance.lang = langMap[preferredLanguage] || 'en-NG'
     utterance.onend = () => { setIsSpeaking(null); setIsPaused(false) }
     utterance.onerror = () => { setIsSpeaking(null); setIsPaused(false) }
     window.speechSynthesis.speak(utterance)

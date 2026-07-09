@@ -23,11 +23,11 @@ SYSTEM_INSTRUCTION = """
 You are FarmBuddy, a friendly and knowledgeable agricultural advisor for Nigerian smallholder farmers.
 Your goal is to provide accurate, practical, and easy-to-understand farming advice.
 
-When a user greets you or makes small talk (e.g. "good morning", "how are you", "hello"), respond warmly and naturally in the same language, then offer to help with their farming needs.
+When a user greets you or makes small talk (e.g. "good morning", "how are you", "hello"), respond warmly and naturally, then offer to help with their farming needs.
 
 For farming questions:
 - Prioritize organic and cost-effective solutions.
-- Use simple English (or the user's language).
+- Use simple, jargon-free language.
 - If you don't know the answer, admit it and suggest consulting a local agricultural extension agent.
 
 Always be friendly, encouraging, and culturally sensitive to Nigerian farmers.
@@ -78,12 +78,24 @@ def _friendly_error(e: Exception) -> str:
     return "Something went wrong on my end. Please try again."
 
 
-def _build_messages(messages_history: list, system_extra: str = "", profile_context: str = "") -> list:
-    system = SYSTEM_INSTRUCTION.strip()
+LANG_INSTRUCTIONS = {
+    'en': "Respond in English.",
+    'ha': "Respond ONLY in the Hausa language (Harshen Hausa). Every sentence of your reply, including greetings and explanations, must be written in Hausa — not English.",
+    'ig': "Respond ONLY in the Igbo language (Asụsụ Igbo). Every sentence of your reply, including greetings and explanations, must be written in Igbo — not English.",
+    'yo': "Respond ONLY in the Yoruba language (Èdè Yorùbá). Every sentence of your reply, including greetings and explanations, must be written in Yoruba — not English.",
+}
+
+
+def _build_messages(messages_history: list, lang_instruction: str, system_extra: str = "", profile_context: str = "") -> list:
+    # The language directive is stated first (primacy) and repeated last
+    # (recency) so it isn't diluted by the large English-language profile/
+    # formatting instructions in between.
+    system = f"LANGUAGE REQUIREMENT: {lang_instruction}\n\n{SYSTEM_INSTRUCTION.strip()}"
     if profile_context:
         system += f"\n\n{profile_context}"
     if system_extra:
         system += f"\n\n{system_extra}"
+    system += f"\n\nREMINDER — LANGUAGE REQUIREMENT: {lang_instruction}"
     result = [{"role": "system", "content": system}]
     for msg in messages_history:
         role = "user" if msg["role"] == "user" else "assistant"
@@ -100,22 +112,16 @@ def ask_openai(messages_history: list, weather_context=None, profile_context=Non
             return _empty()
         return "Hello! How can I help you with farming today?"
 
-    lang_instructions = {
-        'en': "Answer in English.",
-        'ha': "Answer in Hausa language (Harshen Hausa).",
-        'ig': "Answer in Igbo language (Asụsụ Igbo).",
-        'yo': "Answer in Yoruba language (Èdè Yorùbá)."
-    }
-    lang_instruction = lang_instructions.get(language, "Answer in English.")
+    lang_instruction = LANG_INSTRUCTIONS.get(language, LANG_INSTRUCTIONS['en'])
 
     from datetime import datetime
     current_date = datetime.now().strftime("%A, %B %d, %Y")
-    system_extra = f"Current Date: {current_date}\nIMPORTANT INSTRUCTION: {lang_instruction}"
+    system_extra = f"Current Date: {current_date}"
     if weather_context:
         system_extra += f"\nWeather Info: {weather_context}"
 
     recent = messages_history[-10:]
-    messages = _build_messages(recent, system_extra, profile_context=profile_context or "")
+    messages = _build_messages(recent, lang_instruction, system_extra, profile_context=profile_context or "")
 
     try:
         if stream:
@@ -224,7 +230,7 @@ def ask_openai(messages_history: list, weather_context=None, profile_context=Non
         return err
 
 
-def analyze_plant_image(image_path, system_context=None, stream=False):
+def analyze_plant_image(image_path, system_context=None, stream=False, language='en'):
     """Analyze a plant leaf image for disease detection using GPT-4o vision."""
     from PIL import Image
     try:
@@ -233,7 +239,13 @@ def analyze_plant_image(image_path, system_context=None, stream=False):
         img.save(buf, format='JPEG')
         image_b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-        base_prompt = """Analyze this plant leaf image and provide:
+        lang_instruction = LANG_INSTRUCTIONS.get(language, LANG_INSTRUCTIONS['en'])
+
+        base_prompt = f"""LANGUAGE REQUIREMENT: {lang_instruction} This applies to every
+section below (disease name, confidence, symptoms, treatment, prevention) —
+write all of it in the required language, not English.
+
+Analyze this plant leaf image and provide:
 1. **Disease Identification**: What disease or problem do you see? (if any)
 2. **Confidence Level**: How confident are you in this diagnosis?
 3. **Internal Detection (XAI Properties)**: Provide specific bounding box coordinates [ymin, xmin, ymax, xmax] for the areas where you see symptoms. If multiple spots exist, list the most prominent ones.
@@ -241,7 +253,7 @@ def analyze_plant_image(image_path, system_context=None, stream=False):
 5. **Recommended Treatment**: Practical, cost-effective solutions for Nigerian smallholder farmers
 6. **Prevention Tips**: How to prevent this in the future
 
-Use simple English and be practical. If you cannot identify a specific disease, explain what you observe and suggest consulting a local agricultural extension agent.
+Be practical and simple. If you cannot identify a specific disease, explain what you observe and suggest consulting a local agricultural extension agent.
 
 You MUST end your response with a [FARMBUDDY_REFS] ... [/FARMBUDDY_REFS] block
 citing every source you used. Always include IMAGE:uploaded_photo. Add
@@ -253,7 +265,9 @@ current_crops, etc.) that informed your recommendations. Use the exact format
 - IMAGE:uploaded_photo — Visible yellow halos on the leaf indicate early blight.
 - PROFILE:current_crops — Tailored the treatment to your tomato crop.
 - KNOWLEDGE:general — Standard organic fungicide recommendations.
-[/FARMBUDDY_REFS]"""
+[/FARMBUDDY_REFS]
+
+REMINDER — LANGUAGE REQUIREMENT: {lang_instruction}"""
 
         prompt = f"{system_context}\n\n[TASK]: {base_prompt}" if system_context else base_prompt
 
@@ -335,13 +349,7 @@ def respond_to_voice(file_path: str, mime_type: str, language: str = "en") -> st
     """Transcribe a voice note then generate a farming response (used by Telegram bot)."""
     transcription = transcribe_audio_file(file_path, mime_type, language)
 
-    lang_instructions = {
-        'en': "Answer in English.",
-        'ha': "Answer in Hausa language (Harshen Hausa).",
-        'ig': "Answer in Igbo language (Asụsụ Igbo).",
-        'yo': "Answer in Yoruba language (Èdè Yorùbá)."
-    }
-    lang_instruction = lang_instructions.get(language, "Answer in English.")
+    lang_instruction = LANG_INSTRUCTIONS.get(language, LANG_INSTRUCTIONS['en'])
 
     response = client.chat.completions.create(
         model=_CHAT_MODEL,

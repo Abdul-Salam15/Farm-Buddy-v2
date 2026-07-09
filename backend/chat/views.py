@@ -137,7 +137,7 @@ def send_message(request):
             full_response = ""
             try:
                 try:
-                    system_prompt = build_system_prompt(request.user) if request.user.is_authenticated else ""
+                    system_prompt = build_system_prompt(request.user, language=language) if request.user.is_authenticated else ""
                 except Exception:
                     system_prompt = ''
 
@@ -333,7 +333,11 @@ def upload_image(request):
         
         if 'image' not in request.FILES:
             return JsonResponse({'success': False, 'error': 'No image provided'}, status=400)
-        
+
+        language = request.POST.get('language', 'en')
+        if language not in ['en', 'ha', 'ig', 'yo']:
+            language = 'en'
+
         image_file = request.FILES['image']
         
         if image_file.size > 5 * 1024 * 1024:
@@ -413,7 +417,7 @@ def upload_image(request):
         from django.http import StreamingHttpResponse
 
         # Build context for vision analysis
-        system_prompt = build_system_prompt(request.user if request.user.is_authenticated else None)
+        system_prompt = build_system_prompt(request.user, language=language) if request.user.is_authenticated else ""
         weather_context = request.session.get('weather_context') or ''
         combined_context = f"{system_prompt}\n\n[WEATHER INFO]: {weather_context}" if system_prompt else weather_context
 
@@ -422,7 +426,7 @@ def upload_image(request):
             full_response = ""
             try:
                 # Analyze image with OpenAI Vision in streaming mode
-                stream = analyze_plant_image(image_path, system_context=combined_context, stream=True)
+                stream = analyze_plant_image(image_path, system_context=combined_context, stream=True, language=language)
                 
                 for chunk in stream:
                     full_response += chunk

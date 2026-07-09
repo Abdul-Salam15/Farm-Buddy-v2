@@ -1049,6 +1049,7 @@ export default function ChatPage() {
         const formData = new FormData()
         if (messageToSend) formData.append('message', messageToSend)
         formData.append('image', imageToSend)
+        formData.append('language', preferredLanguage)
         if (currentConvId) formData.append('conversation_id', currentConvId.toString())
 
         response = await fetch(`${API_BASE}/upload/`, {

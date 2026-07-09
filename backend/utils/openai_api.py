@@ -79,23 +79,35 @@ def _friendly_error(e: Exception) -> str:
 
 
 LANG_INSTRUCTIONS = {
-    'en': "Respond in English.",
-    'ha': "Respond ONLY in the Hausa language (Harshen Hausa). Every sentence of your reply, including greetings and explanations, must be written in Hausa — not English.",
-    'ig': "Respond ONLY in the Igbo language (Asụsụ Igbo). Every sentence of your reply, including greetings and explanations, must be written in Igbo — not English.",
-    'yo': "Respond ONLY in the Yoruba language (Èdè Yorùbá). Every sentence of your reply, including greetings and explanations, must be written in Yoruba — not English.",
+    'en': "Write your reply in English.",
+    'ha': "Write your reply in the Hausa language (Harshen Hausa).",
+    'ig': "Write your reply in the Igbo language (Asụsụ Igbo).",
+    'yo': "Write your reply in the Yoruba language (Èdè Yorùbá).",
 }
+
+# Explains that the language requirement covers prose only, not the
+# machine-parsed [FARMBUDDY_REFS] tokens — without this carve-out, models
+# can read "every sentence must be in the target language" as conflicting
+# with "you MUST use these exact English tag names" and refuse to answer.
+REF_BLOCK_LANGUAGE_NOTE = (
+    "This covers all prose: your main answer and the explanation text after "
+    "each em-dash in the [FARMBUDDY_REFS] block. The block's structural "
+    "keywords (FARMBUDDY_REFS, PROFILE, HISTORY, WEATHER, KNOWLEDGE, IMAGE, "
+    "and field keys like current_crops) are fixed protocol tokens — always "
+    "keep those in English exactly as shown."
+)
 
 
 def _build_messages(messages_history: list, lang_instruction: str, system_extra: str = "", profile_context: str = "") -> list:
-    # The language directive is stated first (primacy) and repeated last
-    # (recency) so it isn't diluted by the large English-language profile/
-    # formatting instructions in between.
-    system = f"LANGUAGE REQUIREMENT: {lang_instruction}\n\n{SYSTEM_INSTRUCTION.strip()}"
+    # The language directive is stated first (primacy) and echoed briefly at
+    # the end (recency) so it isn't diluted by the profile/formatting
+    # instructions in between.
+    system = f"{lang_instruction} {REF_BLOCK_LANGUAGE_NOTE}\n\n{SYSTEM_INSTRUCTION.strip()}"
     if profile_context:
         system += f"\n\n{profile_context}"
     if system_extra:
         system += f"\n\n{system_extra}"
-    system += f"\n\nREMINDER — LANGUAGE REQUIREMENT: {lang_instruction}"
+    system += f"\n\n({lang_instruction})"
     result = [{"role": "system", "content": system}]
     for msg in messages_history:
         role = "user" if msg["role"] == "user" else "assistant"
@@ -241,9 +253,7 @@ def analyze_plant_image(image_path, system_context=None, stream=False, language=
 
         lang_instruction = LANG_INSTRUCTIONS.get(language, LANG_INSTRUCTIONS['en'])
 
-        base_prompt = f"""LANGUAGE REQUIREMENT: {lang_instruction} This applies to every
-section below (disease name, confidence, symptoms, treatment, prevention) —
-write all of it in the required language, not English.
+        base_prompt = f"""{lang_instruction} {REF_BLOCK_LANGUAGE_NOTE}
 
 Analyze this plant leaf image and provide:
 1. **Disease Identification**: What disease or problem do you see? (if any)
@@ -256,10 +266,15 @@ Analyze this plant leaf image and provide:
 Be practical and simple. If you cannot identify a specific disease, explain what you observe and suggest consulting a local agricultural extension agent.
 
 You MUST end your response with a [FARMBUDDY_REFS] ... [/FARMBUDDY_REFS] block
-citing every source you used. Always include IMAGE:uploaded_photo. Add
-PROFILE:<field_key> entries for any profile fields (soil_type, location,
-current_crops, etc.) that informed your recommendations. Use the exact format
-"TYPE:KEY — explanation" (em-dash). Example:
+citing every source you used, using the exact format "TYPE:KEY — explanation"
+(em-dash). Valid types:
+- IMAGE:uploaded_photo — always include this one.
+- PROFILE:<field_key> — for any profile fields (soil_type, location,
+  current_crops, etc.) that informed your recommendations.
+- WEATHER:OpenWeatherMap — if weather info was provided and used.
+- KNOWLEDGE:general — fallback for general agricultural knowledge.
+
+Example:
 
 [FARMBUDDY_REFS]
 - IMAGE:uploaded_photo — Visible yellow halos on the leaf indicate early blight.
@@ -267,7 +282,7 @@ current_crops, etc.) that informed your recommendations. Use the exact format
 - KNOWLEDGE:general — Standard organic fungicide recommendations.
 [/FARMBUDDY_REFS]
 
-REMINDER — LANGUAGE REQUIREMENT: {lang_instruction}"""
+({lang_instruction})"""
 
         prompt = f"{system_context}\n\n[TASK]: {base_prompt}" if system_context else base_prompt
 

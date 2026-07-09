@@ -2,16 +2,10 @@ from .models import Conversation, Message
 from accounts.models import FarmerProfile
 
 
-_LANG_NAMES = {
-    'en': 'English',
-    'ha': 'Hausa (Harshen Hausa)',
-    'ig': 'Igbo (Asụsụ Igbo)',
-    'yo': 'Yoruba (Èdè Yorùbá)',
-}
-
-
-def build_system_prompt(user, language='en'):
-    """Build a plain-text system prompt from the user's FarmerProfile and recent assistant messages."""
+def build_profile_context(user):
+    """Plain-text farmer profile + recent conversation history, with no
+    format/instructions block. Shared by both the text-chat and image-
+    analysis flows, each of which layers its own instructions on top."""
     try:
         profile = user.farmerprofile
         profile_text = profile.to_context_string()
@@ -31,19 +25,23 @@ def build_system_prompt(user, language='en'):
         for i, msg in enumerate(reversed(list(past)), 1):
             history_text += f'[Past-{i}] {msg.content[:300]}\n'
 
-    lang_name = _LANG_NAMES.get(language, _LANG_NAMES['en'])
-
-    system_prompt = f"""
-LANGUAGE REQUIREMENT: Write your entire reply to the farmer in {lang_name}, not English (unless {lang_name} is English).
-
-You are FarmBuddy, a friendly and knowledgeable agricultural assistant
-for smallholder farmers in Nigeria and West Africa.
-
-FARMER PROFILE:
+    return f"""FARMER PROFILE:
 
 {profile_text}
 
-{history_text}
+{history_text}"""
+
+
+def build_system_prompt(user):
+    """Build the full text-chat system prompt: persona + farmer profile +
+    [FARMBUDDY_REFS] citation instructions."""
+    profile_context = build_profile_context(user)
+
+    system_prompt = f"""
+You are FarmBuddy, a friendly and knowledgeable agricultural assistant
+for smallholder farmers in Nigeria and West Africa.
+
+{profile_context}
 
 INSTRUCTIONS:
 

@@ -10,7 +10,7 @@ import os
 # Add parent directory to path to import utils
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.openai_api import ask_openai, analyze_plant_image
-from .context_builder import build_system_prompt, parse_xai_refs
+from .context_builder import build_system_prompt, build_profile_context, parse_xai_refs
 from utils.weather_api import get_weather, get_forecast, get_weather_by_city, get_forecast_by_city, format_weather_for_ai, format_forecast_for_ai
 
 from .models import Conversation, Message
@@ -137,7 +137,7 @@ def send_message(request):
             full_response = ""
             try:
                 try:
-                    system_prompt = build_system_prompt(request.user, language=language) if request.user.is_authenticated else ""
+                    system_prompt = build_system_prompt(request.user) if request.user.is_authenticated else ""
                 except Exception:
                     system_prompt = ''
 
@@ -416,8 +416,14 @@ def upload_image(request):
 
         from django.http import StreamingHttpResponse
 
-        # Build context for vision analysis
-        system_prompt = build_system_prompt(request.user, language=language) if request.user.is_authenticated else ""
+        # Build context for vision analysis. Use the plain profile context
+        # (not build_system_prompt) here — analyze_plant_image() supplies
+        # its own [FARMBUDDY_REFS] instructions tailored to image analysis
+        # (including the IMAGE type), and layering the text-chat prompt's
+        # PROFILE/HISTORY/WEATHER/KNOWLEDGE-only ref spec on top of it
+        # produced contradictory instructions that could make the model
+        # refuse to answer.
+        system_prompt = build_profile_context(request.user) if request.user.is_authenticated else ""
         weather_context = request.session.get('weather_context') or ''
         combined_context = f"{system_prompt}\n\n[WEATHER INFO]: {weather_context}" if system_prompt else weather_context
 

@@ -242,8 +242,57 @@ def ask_openai(messages_history: list, weather_context=None, profile_context=Non
         return err
 
 
+def _translate_farmbuddy_text(text: str, language: str) -> str:
+    """Translate an English FarmBuddy response (possibly containing a
+    [FARMBUDDY_REFS] block) into the target language via a plain text-only
+    call. Kept as a separate pass rather than asking the vision model to
+    answer non-English directly — that combination reliably triggered a
+    refusal ("I'm sorry, I can't assist with that") even after multiple
+    rounds of prompt-wording fixes, while translation is a low-risk task
+    text models comply with reliably."""
+    lang_instruction = LANG_INSTRUCTIONS.get(language, LANG_INSTRUCTIONS['en'])
+    system = (
+        f"You are a translation engine. Translate the following farming-advice "
+        f"text. {lang_instruction} {REF_BLOCK_LANGUAGE_NOTE}\n\n"
+        "Translate only prose: headings, body sentences, and the explanation "
+        "text after each em-dash (—) in the [FARMBUDDY_REFS] block. Do NOT "
+        "translate, remove, or reorder the [FARMBUDDY_REFS]/[/FARMBUDDY_REFS] "
+        "markers, the TYPE:KEY prefixes (e.g. IMAGE:uploaded_photo, "
+        "PROFILE:current_crops), or any numeric coordinate lists such as "
+        "[10, 50, 110, 150]. Preserve the markdown structure and line breaks. "
+        "Output only the translated text, with no preamble or commentary."
+    )
+    try:
+        response = client.chat.completions.create(
+            model=_CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": text},
+            ],
+        )
+        translated = response.choices[0].message.content.strip()
+    except Exception as e:
+        logger.error("translate_farmbuddy_text error: %s", e)
+        return "(Translation unavailable — showing English)\n\n" + text
+
+    if '[FARMBUDDY_REFS]' in text and (
+        '[FARMBUDDY_REFS]' not in translated or '[/FARMBUDDY_REFS]' not in translated
+    ):
+        # Translation dropped the citation block — splice the original back
+        # on rather than losing citations.
+        translated += "\n\n" + text[text.index('[FARMBUDDY_REFS]'):]
+
+    return translated
+
+
 def analyze_plant_image(image_path, system_context=None, stream=False, language='en'):
-    """Analyze a plant leaf image for disease detection using GPT-4o vision."""
+    """Analyze a plant leaf image for disease detection using GPT-4o vision.
+
+    The vision call itself is always made in English — asking it to answer
+    directly in Hausa/Igbo/Yoruba reliably triggered a refusal regardless of
+    prompt wording. For non-English requests, the (reliable) English result
+    is translated afterward via _translate_farmbuddy_text().
+    """
     from PIL import Image
     try:
         img = Image.open(image_path)
@@ -251,11 +300,7 @@ def analyze_plant_image(image_path, system_context=None, stream=False, language=
         img.save(buf, format='JPEG')
         image_b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-        lang_instruction = LANG_INSTRUCTIONS.get(language, LANG_INSTRUCTIONS['en'])
-
-        base_prompt = f"""{lang_instruction} {REF_BLOCK_LANGUAGE_NOTE}
-
-Analyze this plant leaf image and provide:
+        base_prompt = """Analyze this plant leaf image and provide:
 1. **Disease Identification**: What disease or problem do you see? (if any)
 2. **Confidence Level**: How confident are you in this diagnosis?
 3. **Internal Detection (XAI Properties)**: Provide specific bounding box coordinates [ymin, xmin, ymax, xmax] for the areas where you see symptoms. If multiple spots exist, list the most prominent ones.
@@ -280,9 +325,7 @@ Example:
 - IMAGE:uploaded_photo — Visible yellow halos on the leaf indicate early blight.
 - PROFILE:current_crops — Tailored the treatment to your tomato crop.
 - KNOWLEDGE:general — Standard organic fungicide recommendations.
-[/FARMBUDDY_REFS]
-
-({lang_instruction})"""
+[/FARMBUDDY_REFS]"""
 
         prompt = f"{system_context}\n\n[TASK]: {base_prompt}" if system_context else base_prompt
 
@@ -296,19 +339,43 @@ Example:
             }
         ]
 
+        if language == 'en':
+            if stream:
+                def stream_generator():
+                    try:
+                        response = client.chat.completions.create(
+                            model=_VISION_MODEL,
+                            messages=messages,
+                            stream=True,
+                        )
+                        for chunk in response:
+                            if chunk.choices and chunk.choices[0].delta.content:
+                                yield chunk.choices[0].delta.content
+                    except Exception as e:
+                        logger.error("Vision streaming error: %s", e)
+                        yield f" {_friendly_error(e)}"
+                return stream_generator()
+            else:
+                response = client.chat.completions.create(
+                    model=_VISION_MODEL,
+                    messages=messages,
+                )
+                return response.choices[0].message.content.strip()
+
+        # Non-English: get the (reliable) English analysis first, then
+        # translate. Requires the full text, so the vision call itself is
+        # always non-streaming here even if the caller asked for streaming.
         if stream:
             def stream_generator():
                 try:
                     response = client.chat.completions.create(
                         model=_VISION_MODEL,
                         messages=messages,
-                        stream=True,
                     )
-                    for chunk in response:
-                        if chunk.choices and chunk.choices[0].delta.content:
-                            yield chunk.choices[0].delta.content
+                    english_text = response.choices[0].message.content.strip()
+                    yield _translate_farmbuddy_text(english_text, language)
                 except Exception as e:
-                    logger.error("Vision streaming error: %s", e)
+                    logger.error("Vision translation error: %s", e)
                     yield f" {_friendly_error(e)}"
             return stream_generator()
         else:
@@ -316,7 +383,8 @@ Example:
                 model=_VISION_MODEL,
                 messages=messages,
             )
-            return response.choices[0].message.content.strip()
+            english_text = response.choices[0].message.content.strip()
+            return _translate_farmbuddy_text(english_text, language)
 
     except Exception as e:
         logger.error("analyze_plant_image error: %s", e)

@@ -574,12 +574,15 @@ async def reset_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Explain how to link accounts."""
+    query = update.callback_query
+    if query: await query.answer()
+
     chat_id = update.effective_chat.id
     info = await sync_to_async(db_get_profile_info)(chat_id)
     lang = info['lang'] if info else 'en'
     l = get_localized_labels(lang)
-    
-    await update.message.reply_text(l['connect_info'], parse_mode='Markdown')
+
+    await update.effective_message.reply_text(l['connect_info'], parse_mode='Markdown')
 
 async def logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /logout command."""
